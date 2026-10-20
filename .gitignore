@@ -31,3 +31,6 @@ Thumbs.db
 .cache/
 .vite/
 .mongodb-binaries/
+
+# Photos de profil (stockage local runtime)
+backend/uploads/

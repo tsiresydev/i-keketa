@@ -32,6 +32,12 @@ const envSchema = z.object({
     .positive()
     .default(10 * 1000),
   MESSAGE_MAX_LENGTH: z.coerce.number().int().positive().default(2000),
+  PHOTO_MAX_SIZE_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(2 * 1024 * 1024),
+  PHOTO_STORAGE_DIR: z.string().default('uploads/photos'),
   USE_IN_MEMORY_DB: booleanFromEnv(false),
   MONGOMS_VERSION: z.string().default('7.0.24'),
 });

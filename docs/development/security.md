@@ -1,6 +1,6 @@
 # Security — Plateforme de Chat
 
-Mesures appliquées dans le Sprint 1 et Vérifiables dans `backend/src/` et `frontend/src/`.
+Mesures appliquées dans les Sprints 1 et 2 et vérifiables dans `backend/src/` et `frontend/src/`.
 
 ## Secrets
 
@@ -67,6 +67,31 @@ Mesures appliquées dans le Sprint 1 et Vérifiables dans `backend/src/` et `fro
 - L'email n'est jamais exposé au partenaire.
 - Chaque utilisateur reçoit un pseudonyme anonyme généré par le serveur à l'inscription.
 - L'historique d'une session n'est visible que par ses deux participants.
+- `displayName` et `photoUrl` ne sont transmis au partenaire que si l'utilisateur les a
+  explicitement renseignés : sans eux, il n'est identifié que par son pseudonyme.
+- L'annuaire `GET /api/users` exclut toujours l'utilisateur connecté de sa propre liste et
+  n'expose jamais l'email.
+
+## Photos de profil
+
+- Un seul fichier par requête, limité à 2 Mo (`PHOTO_MAX_SIZE_BYTES`).
+- Le type MIME déclaré **et** la signature binaire du fichier (magic bytes JPEG/PNG/WebP) sont
+  vérifiés : un fichier renommé ou un script déguisé en image est refusé (`400`).
+- Les noms de fichiers sont générés par le serveur (identifiant de l'utilisateur + UUID) : ils ne
+  sont pas devinables et ne reprennent jamais le nom d'origine du fichier.
+- Le contenu est servi en statique par `express.static` (aucune interprétation) ; le dossier de
+  stockage n'est pas versionné.
+- Le remplacement d'une photo supprime l'ancienne du disque ; `DELETE /api/users/me/photo` supprime
+  la photo et son fichier.
+- Limite connue : le stockage local n'est pas durable sur un hébergeur éphémère (Vercel). Le
+  service de stockage est isolé pour permettre le branchement d'un stockage objet.
+
+## Discussion directe
+
+- L'événement `chat:start` est authentifié comme le reste de la connexion Socket.IO.
+- La cible doit être connectée ; une cible occupée ou absente reçoit l'erreur `USER_UNAVAILABLE`
+  (aucune information divulguée sur sa présence exacte).
+- Le demandeur ne peut pas cibler son propre compte.
 
 ## Dépendances
 

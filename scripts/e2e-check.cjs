@@ -18,6 +18,20 @@ const call = async (path, options = {}) => {
   return { status: response.status, body };
 };
 
+/** Requête multipart (envoi d'une photo de profil). */
+const upload = async (path, token, fileName, contentType, bytes) => {
+  const formData = new FormData();
+  formData.append('photo', new Blob([bytes], { type: contentType }), fileName);
+
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const body = await response.json().catch(() => null);
+  return { status: response.status, body };
+};
+
 const waitFor = (socket, event, timeoutMs = 10000) =>
   new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`Timeout sur ${event}`)), timeoutMs);
@@ -143,10 +157,26 @@ const main = async () => {
     `statut ${history.status}, ${history.body?.messages?.length ?? 0} message(s)`,
   );
 
+  // Utilisateur tiers : vérifie l'accès réservé aux participants, puis sert
+  // de cible à la discussion directe.
   const third = await call('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email: `Tiana${stamp}@example.mg`, password: 'MotDePasse1' }),
+    body: JSON.stringify({
+      email: `Tiana${stamp}@example.mg`,
+      password: 'MotDePasse1',
+      displayName: 'Tiana',
+    }),
   });
+
+  if (third.status !== 201) {
+    console.error(
+      `ÉCHEC : inscription impossible (statut ${third.status}). ` +
+        `Limite d'authentification atteinte ? Attendez la fin de la fenêtre de rate limiting ` +
+        `ou augmentez AUTH_RATE_LIMIT_MAX.`,
+    );
+    process.exit(1);
+  }
+
   const outsider = await call(`/api/chat/matches/${aliceEvent.matchId}/messages`, {
     headers: { Authorization: `Bearer ${third.body.token}` },
   });
@@ -157,6 +187,161 @@ const main = async () => {
   const errorPayload = await emptyMessage;
   check('Message vide refusé', errorPayload.code === 'INVALID_MESSAGE', errorPayload.code);
 
+  /* ---------- Sprint 2 : profil, photo, annuaire, discussion directe ---------- */
+
+  const token = registration.body.token;
+
+  const profileUpdate = await call('/api/users/me', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      displayName: 'Miora',
+      interests: ['musique', 'voyage'],
+      location: 'Antananarivo',
+    }),
+  });
+  check(
+    'PUT /api/users/me',
+    profileUpdate.status === 200 &&
+      profileUpdate.body?.user?.displayName === 'Miora' &&
+      profileUpdate.body?.user?.interests?.length === 2,
+    `statut ${profileUpdate.status}`,
+  );
+
+  const invalidProfile = await call('/api/users/me', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ displayName: 'x' }),
+  });
+  check(
+    'PUT /api/users/me (données invalides)',
+    invalidProfile.status === 400,
+    `statut ${invalidProfile.status}`,
+  );
+
+  const pngBytes = new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01, 0x02, 0x03,
+  ]);
+
+  const photo = await upload('/api/users/me/photo', token, 'profil.png', 'image/png', pngBytes);
+  check(
+    'POST /api/users/me/photo',
+    photo.status === 200 && typeof photo.body?.user?.photoUrl === 'string',
+    `statut ${photo.status}`,
+  );
+
+  const servedPhoto = await fetch(`${baseUrl}${photo.body.user.photoUrl}`);
+  check(
+    'GET /uploads/photos/:fichier',
+    servedPhoto.status === 200 &&
+      (servedPhoto.headers.get('content-type') ?? '').includes('image/png'),
+    `statut ${servedPhoto.status}`,
+  );
+
+  const fakeImage = await upload(
+    '/api/users/me/photo',
+    token,
+    'faux.png',
+    'image/png',
+    new Uint8Array([0x41, 0x42, 0x43, 0x44]),
+  );
+  check(
+    'Photo dont le contenu ne correspond pas refusée',
+    fakeImage.status === 400,
+    `statut ${fakeImage.status}`,
+  );
+
+  const badType = await upload(
+    '/api/users/me/photo',
+    token,
+    'script.txt',
+    'text/plain',
+    new Uint8Array([0x41, 0x42]),
+  );
+  check('Photo de type non autorisé refusée', badType.status === 400, `statut ${badType.status}`);
+
+  const photoDeletion = await call('/api/users/me/photo', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  check(
+    'DELETE /api/users/me/photo',
+    photoDeletion.status === 200 && photoDeletion.body?.user?.photoUrl === undefined,
+    `statut ${photoDeletion.status}`,
+  );
+
+  const directory = await call('/api/users', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  check(
+    'GET /api/users',
+    directory.status === 200 && Array.isArray(directory.body?.users),
+    `statut ${directory.status}, ${directory.body?.total ?? 0} résultat(s)`,
+  );
+
+  const filtered = await call('/api/users?interests=musique', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const filteredUsers = filtered.body?.users ?? [];
+  const allMatchInterest = filteredUsers.every((user) =>
+    (user.interests ?? []).some((interest) => interest.toLowerCase() === 'musique'),
+  );
+  check(
+    'GET /api/users (filtre par intérêt)',
+    filtered.status === 200 && allMatchInterest,
+    `statut ${filtered.status}, ${filtered.body?.total ?? 0} résultat(s)`,
+  );
+
+  const selfExclusion = await call('/api/users', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const includesSelf = (selfExclusion.body?.users ?? []).some(
+    (user) => user.id === registration.body.user.id,
+  );
+  check('L’utilisateur courant est exclu de l’annuaire', !includesSelf, `${includesSelf}`);
+
+  const unavailable = waitFor(alice, 'chat:error');
+  alice.emit('chat:start', { userId: '507f1f77bcf86cd799439011' });
+  const unavailableError = await unavailable;
+  check(
+    'chat:start vers un utilisateur indisponible',
+    unavailableError.code === 'USER_UNAVAILABLE',
+    unavailableError.code,
+  );
+
+  const tianaSocket = await connect(third.body.token);
+
+  const directMatch = waitFor(alice, 'match:found');
+  const tianaMatch = waitFor(tianaSocket, 'match:found');
+  alice.emit('chat:start', { userId: third.body.user.id });
+
+  const [directEvent, tianaEvent] = await Promise.all([directMatch, tianaMatch]);
+  check(
+    'Discussion directe (chat:start)',
+    directEvent.matchId === tianaEvent.matchId,
+    `match ${directEvent.matchId}`,
+  );
+  check(
+    'Le nom affiché est transmis au partenaire',
+    directEvent.partner.displayName === 'Tiana',
+    directEvent.partner.displayName,
+  );
+  check(
+    'Un profil modifié après la connexion est pris en compte',
+    tianaEvent.partner.displayName === 'Miora',
+    tianaEvent.partner.displayName,
+  );
+
+  const directMessage = waitFor(tianaSocket, 'chat:message');
+  alice.emit('chat:message', { matchId: directEvent.matchId, content: 'Bonjour Tiana' });
+  const directPayload = await directMessage;
+  check(
+    'Message dans une discussion directe',
+    directPayload.message.content === 'Bonjour Tiana',
+    directPayload.message.content,
+  );
+
+  tianaSocket.disconnect();
   alice.disconnect();
   bob.disconnect();
 

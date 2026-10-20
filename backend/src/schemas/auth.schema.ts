@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { env } from '../config/env';
+import { optionalProfileFieldsSchema } from './user.schema';
 
 /**
  * Schémas de validation des entrées (côté serveur — source de vérité).
@@ -25,6 +26,7 @@ const passwordSchema = z
 export const registerSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
+  ...optionalProfileFieldsSchema,
 });
 
 export const loginSchema = z.object({

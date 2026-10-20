@@ -17,6 +17,8 @@ export interface ChatSocketState {
   chatStatus: ChatStatus;
   matchId: string | null;
   partnerPseudonym: string | null;
+  partnerDisplayName: string | null;
+  partnerPhotoUrl: string | null;
   messages: ChatMessage[];
   error: string | null;
   notice: string | null;
@@ -26,6 +28,7 @@ export interface ChatSocketActions {
   joinQueue: () => void;
   leaveQueue: () => void;
   skipPartner: () => void;
+  startDirectChat: (userId: string) => boolean;
   sendMessage: (content: string) => boolean;
   clearError: () => void;
   clearNotice: () => void;
@@ -42,6 +45,8 @@ const initialState: ChatSocketState = {
   chatStatus: 'idle',
   matchId: null,
   partnerPseudonym: null,
+  partnerDisplayName: null,
+  partnerPhotoUrl: null,
   messages: [],
   error: null,
   notice: null,
@@ -71,6 +76,8 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
         chatStatus: 'idle',
         matchId: null,
         partnerPseudonym: null,
+        partnerDisplayName: null,
+        partnerPhotoUrl: null,
       }));
     });
 
@@ -96,6 +103,8 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
         chatStatus: 'matched',
         matchId: payload.matchId,
         partnerPseudonym: payload.partner.pseudonym,
+        partnerDisplayName: payload.partner.displayName ?? null,
+        partnerPhotoUrl: payload.partner.photoUrl ?? null,
         messages: [],
         notice: null,
         error: null,
@@ -138,6 +147,8 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
         chatStatus: 'idle',
         matchId: null,
         partnerPseudonym: null,
+        partnerDisplayName: null,
+        partnerPhotoUrl: null,
         messages: [],
         notice: END_REASON_MESSAGES[payload.reason] ?? 'La discussion est terminée.',
       }));
@@ -164,6 +175,25 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
 
   const skipPartner = useCallback(() => {
     socketRef.current?.emit('chat:skip');
+  }, []);
+
+  /**
+   * Demande une discussion directe avec l'utilisateur ciblé.
+   * Le serveur répond par `match:found` ou par une erreur `USER_UNAVAILABLE`.
+   */
+  const startDirectChat = useCallback((userId: string): boolean => {
+    const socket = socketRef.current;
+
+    if (!socket || !socket.connected) {
+      setState((previous) => ({
+        ...previous,
+        error: 'La connexion est perdue. Reconnectez-vous pour démarrer la discussion.',
+      }));
+      return false;
+    }
+
+    socket.emit('chat:start', { userId });
+    return true;
   }, []);
 
   const sendMessage = useCallback(
@@ -204,6 +234,7 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
     joinQueue,
     leaveQueue,
     skipPartner,
+    startDirectChat,
     sendMessage,
     clearError,
     clearNotice,

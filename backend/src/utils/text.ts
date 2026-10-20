@@ -33,8 +33,7 @@ export const isMessageContentSafe = (value: string): boolean =>
 
 /**
  * Génère un pseudonyme anonyme lisible, unique, destiné à être affiché au partenaire.
- */
-const PSEUDONYM_ADJECTIVES = [
+ */ const PSEUDONYM_ADJECTIVES = [
   'Curieux',
   'Discret',
   'Enjoué',
@@ -53,4 +52,31 @@ export const generatePseudonym = (): string => {
   const adjective = PSEUDONYM_ADJECTIVES[randomInt(PSEUDONYM_ADJECTIVES.length)] ?? 'Anonyme';
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
   return `${adjective}-${suffix}`;
+};
+
+/**
+ * Normalise une liste de centres d'intérêt :
+ * - nettoyage des espaces et caractères de contrôle ;
+ * - déduplication sans tenir compte de la casse ;
+ * - conservation de l'ordre de saisie.
+ */
+export const normalizeInterests = (interests: string[]): string[] => {
+  const seen = new Set<string>();
+
+  return interests
+    .map((interest) => sanitizeText(interest))
+    .filter((interest) => {
+      if (interest.length === 0) {
+        return false;
+      }
+
+      const key = interest.toLowerCase();
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
 };

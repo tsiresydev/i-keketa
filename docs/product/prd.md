@@ -109,9 +109,9 @@ Faciliter les rencontres amicales et les échanges anonymes entre utilisateurs m
 | Sprint | Contenu | État |
 |--------|---------|------|
 | Sprint 1 | Inscription/connexion, chat aléatoire, messagerie texte temps réel | **Livré** (React + Express + MongoDB + Socket.IO) |
-| Sprint 2 | Profil utilisateur, filtres de recherche | Non démarré |
+| Sprint 2 | Profil utilisateur (nom, intérêts, localisation, photo), filtres de recherche, discussion directe | **Livré** (pages `/profil` et `/decouvrir`, `PUT /api/users/me`, `POST|DELETE /api/users/me/photo`, `GET /api/users`, événement `chat:start`) |
 | Sprint 3 | Messagerie audiovisuelle, signalement d'abus, modération | Non démarré |
 
-Le cahier des charges reste la source de vérité. Les choix techniques appliqués au Sprint 1
-(React, Socket.IO, JWT, Zod, bcrypt) sont documentés dans `docs/architecture/architecture.md`
-et restent ouverts à validation par le responsable de projet.
+Le cahier des charges reste la source de vérité. Les choix techniques appliqués aux Sprints 1 et 2
+(React, Socket.IO, JWT, Zod, bcrypt, stockage local des photos) sont documentés dans
+`docs/architecture/architecture.md` et restent ouverts à validation par le responsable de projet.

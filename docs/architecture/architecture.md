@@ -25,32 +25,38 @@ backend/src/
 ├── db/           # connexion MongoDB (+ repli MongoDB en mémoire en développement)
 ├── models/       # schémas Mongoose : User, Message, Match
 ├── modules/      # auth, users, chat → routes / contrôleurs / services
-├── middleware/   # authenticate, validate, rate-limiters, error-handler
+├── middleware/   # authenticate, validate, upload, rate-limiters, error-handler
 ├── realtime/     # serveur Socket.IO (authentification, événements, quotas)
 ├── schemas/      # schémas de validation Zod (source de vérité des entrées)
 ├── types/        # augmentations de types (Express)
 └── utils/        # jwt, password, api-error, async-handler, text
 
 frontend/src/
-├── components/   # Alert, AuthLayout, ChatComposer, FormField, MessageBubble, ProtectedRoute
+├── components/   # Alert, AppHeader, AuthLayout, ChatComposer, FormField, MessageBubble, ProtectedRoute
 ├── context/      # contexte d'authentification (contexte + provider)
 ├── hooks/        # useAuth, useChatSocket
 ├── lib/          # api-client, auth-storage, socket-client, validation
-├── pages/        # LoginPage, RegisterPage, ChatPage
+├── pages/        # LoginPage, RegisterPage, ChatPage, ProfilePage, DiscoverPage
 ├── styles/       # feuille de style globale (CSS natif, variables CSS)
 └── types.ts      # types partagés avec l'API
 ```
 
 ## Flux de données
 
-Client ↔ API REST (auth, profil courant, historique) + Socket.IO (file d'attente, mise en relation,
-messages temps réel).
+Client ↔ API REST (auth, profil, annuaire, historique) + Socket.IO (file d'attente, mise en relation,
+messages temps réel, discussion directe).
 
-- `POST /api/auth/register` → création du compte, pseudonyme anonyme généré par le serveur.
+- `POST /api/auth/register` → création du compte, pseudonyme anonyme généré par le serveur,
+  profil facultatif (nom affiché, intérêts, localisation).
 - `POST /api/auth/login` → jeton JWT (Bearer).
 - `GET /api/users/me` → profil de l'utilisateur authentifié.
+- `PUT /api/users/me` → mise à jour du profil.
+- `POST /api/users/me/photo` / `DELETE /api/users/me/photo` → photo de profil (stockage local,
+  servie sur `/uploads`).
+- `GET /api/users` → annuaire filtrable (intérêts, localisation, recherche) et paginé.
 - `GET /api/chat/matches/:matchId/messages` → historique, réservé aux participants.
-- Socket.IO : `queue:join` / `queue:leave` / `chat:message` / `chat:skip` (client → serveur) ;
+- Socket.IO : `queue:join` / `queue:leave` / `chat:message` / `chat:skip` / `chat:start`
+  (client → serveur) ;
   `queue:status` / `match:found` / `match:ended` / `chat:message` / `chat:history` / `chat:error`
   (serveur → client).
 
@@ -61,6 +67,13 @@ Voir `docs/architecture/api.md` pour les contrats détaillés.
 - MongoDB (persistance) — instance réelle en production, MongoDB en mémoire possible en développement.
 - Vercel (frontend) / Render (backend) — déploiement proposé, non configuré dans ce sprint.
 - Service TURN/STUN pour WebRTC (A/V) — à valider, hors périmètre du Sprint 1.
+
+## Stockage des photos de profil
+
+Les photos sont stockées sur le disque du backend (`backend/uploads/photos/`, chemin relatif au
+process) et servies en statique sur `/uploads`. Le service `photo-storage.service` isole cet accès :
+c'est le point d'extension prévu pour brancher un stockage objet (S3, Cloudinary) sans modifier les
+contrôleurs ni l'interface. Le dossier n'est pas versionné (`.gitignore`).
 
 ## Gestion des erreurs
 
@@ -88,7 +101,7 @@ Voir `docs/architecture/.env.example` et `backend/.env.example`.
 
 ## Décisions techniques validées / à valider
 
-**Validées par l'implémentation du Sprint 1 :**
+**Validées par l'implémentation des Sprints 1 et 2 :**
 
 | Sujet | Décision | Justification |
 |-------|----------|---------------|
@@ -99,6 +112,8 @@ Voir `docs/architecture/.env.example` et `backend/.env.example`.
 | Mots de passe | bcrypt (`bcryptjs`) | Algorithme bcrypt demandé par la documentation ; implémentation pure JS, sans compilation native |
 | Tests | Vitest + Supertest + socket.io-client + mongodb-memory-server | Exécution rapide, tests d'intégration sur un vrai moteur MongoDB |
 | Base de données de développement | MongoDB en mémoire (`mongodb-memory-server`) | Permet de lancer la plateforme sans installer MongoDB ; désactivé en production |
+| Photo de profil | Stockage local + `express.static` sur `/uploads` | Aucun service externe à configurer pour le sprint ; le service de stockage est isolé pour permettre un passage ultérieur à un stockage objet |
+| Discussion directe | Événement socket `chat:start` | Réutilise la mécanique de session existante (`match:found`, historique) sans nouveau modèle de données |
 
 **À valider :**
 

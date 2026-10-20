@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { authApi } from '../lib/api-client';
 import { authStorage } from '../lib/auth-storage';
-import type { CurrentUser } from '../types';
+import type { CurrentUser, ProfileUpdatePayload } from '../types';
 import { AuthContext, type AuthContextValue, type AuthStatus } from './auth-context';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -63,8 +63,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const register = useCallback(
-    async (email: string, password: string) => {
-      const authResponse = await authApi.register(email.trim().toLowerCase(), password);
+    async (email: string, password: string, profile?: ProfileUpdatePayload) => {
+      const authResponse = await authApi.register(email.trim().toLowerCase(), password, profile);
       establishSession(authResponse);
     },
     [establishSession],
@@ -77,9 +77,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setStatus('anonymous');
   }, []);
 
+  const applyUser = useCallback((updatedUser: CurrentUser) => {
+    setUser(updatedUser);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, token, login, register, logout }),
-    [status, user, token, login, register, logout],
+    () => ({ status, user, token, login, register, logout, applyUser }),
+    [status, user, token, login, register, logout, applyUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

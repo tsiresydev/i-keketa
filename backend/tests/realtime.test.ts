@@ -1,4 +1,5 @@
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
+import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MatchModel } from '../src/models/match.model';
 import { MessageModel } from '../src/models/message.model';
@@ -6,7 +7,7 @@ import { createTestContext, registerTestUser, type TestContext } from './helpers
 
 interface MatchFoundEvent {
   matchId: string;
-  partner: { pseudonym: string };
+  partner: { pseudonym: string; displayName?: string; photoUrl?: string };
 }
 
 const waitForEvent = <T>(socket: ClientSocket, event: string, timeoutMs = 10_000): Promise<T> =>
@@ -248,5 +249,151 @@ describe('Temps réel — chat aléatoire et messagerie', () => {
     expect((await ended).reason).toBe('user_skipped');
     expect((await waiting).status).toBe('waiting');
     expect(context.realtime.matchmaking.getQueueSize()).toBe(1);
+  });
+});
+
+describe('Temps réel — discussion directe (chat:start)', () => {
+  let context: TestContext;
+  let url: string;
+  const clients: ClientSocket[] = [];
+
+  beforeEach(async () => {
+    context = await createTestContext();
+    const address = context.httpServer.address();
+    const port = typeof address === 'object' && address !== null ? address.port : 0;
+    url = `http://127.0.0.1:${port}`;
+  });
+
+  afterEach(async () => {
+    clients.forEach((client) => client.close());
+    clients.length = 0;
+    await context.close();
+  });
+
+  const connect = async (token: string): Promise<ClientSocket> => {
+    const client = await connectClient(url, token);
+    clients.push(client);
+    return client;
+  };
+
+  it('met en relation directe deux utilisateurs connectés', async () => {
+    const alice = await registerTestUser(context.app, { displayName: 'Miora' });
+    const bob = await registerTestUser(context.app);
+
+    const aliceSocket = await connect(alice.token);
+    const bobSocket = await connect(bob.token);
+
+    const aliceMatch = waitForEvent<MatchFoundEvent>(aliceSocket, 'match:found');
+    const bobMatch = waitForEvent<MatchFoundEvent>(bobSocket, 'match:found');
+
+    aliceSocket.emit('chat:start', { userId: bob.userId });
+
+    const [aliceEvent, bobEvent] = await Promise.all([aliceMatch, bobMatch]);
+
+    expect(aliceEvent.matchId).toBe(bobEvent.matchId);
+    expect(aliceEvent.partner.pseudonym).toBe(bob.pseudonym);
+    expect(bobEvent.partner.displayName).toBe('Miora');
+
+    const match = await MatchModel.findById(aliceEvent.matchId);
+    expect(match?.status).toBe('active');
+    expect(match?.participants).toHaveLength(2);
+  });
+
+  it('permet de discuter ensuite dans la session directe', async () => {
+    const alice = await registerTestUser(context.app);
+    const bob = await registerTestUser(context.app);
+
+    const aliceSocket = await connect(alice.token);
+    const bobSocket = await connect(bob.token);
+
+    const aliceMatch = waitForEvent<MatchFoundEvent>(aliceSocket, 'match:found');
+    const bobMatch = waitForEvent<MatchFoundEvent>(bobSocket, 'match:found');
+
+    aliceSocket.emit('chat:start', { userId: bob.userId });
+
+    const [{ matchId }] = await Promise.all([aliceMatch, bobMatch]);
+
+    const received = waitForEvent<{ message: { content: string } }>(bobSocket, 'chat:message');
+    aliceSocket.emit('chat:message', { matchId, content: 'Bonjour !' });
+
+    expect((await received).message.content).toBe('Bonjour !');
+  });
+
+  it('renvoie USER_UNAVAILABLE si la cible n’est pas connectée', async () => {
+    const alice = await registerTestUser(context.app);
+    const bob = await registerTestUser(context.app);
+
+    const aliceSocket = await connect(alice.token);
+
+    const error = waitForEvent<{ code: string; message: string }>(aliceSocket, 'chat:error');
+    aliceSocket.emit('chat:start', { userId: bob.userId });
+
+    expect((await error).code).toBe('USER_UNAVAILABLE');
+  });
+
+  it('renvoie USER_UNAVAILABLE si la cible est déjà en discussion', async () => {
+    const alice = await registerTestUser(context.app);
+    const bob = await registerTestUser(context.app);
+    const charlie = await registerTestUser(context.app);
+
+    const aliceSocket = await connect(alice.token);
+    const bobSocket = await connect(bob.token);
+    const charlieSocket = await connect(charlie.token);
+
+    const aliceMatch = waitForEvent<MatchFoundEvent>(aliceSocket, 'match:found');
+    const bobMatch = waitForEvent<MatchFoundEvent>(bobSocket, 'match:found');
+
+    aliceSocket.emit('queue:join');
+    bobSocket.emit('queue:join');
+    await Promise.all([aliceMatch, bobMatch]);
+
+    const error = waitForEvent<{ code: string }>(charlieSocket, 'chat:error');
+    charlieSocket.emit('chat:start', { userId: alice.userId });
+
+    expect((await error).code).toBe('USER_UNAVAILABLE');
+  });
+
+  it('refuse de démarrer une discussion avec soi-même', async () => {
+    const alice = await registerTestUser(context.app);
+    const aliceSocket = await connect(alice.token);
+
+    const error = waitForEvent<{ code: string }>(aliceSocket, 'chat:error');
+    aliceSocket.emit('chat:start', { userId: alice.userId });
+
+    expect((await error).code).toBe('USER_UNAVAILABLE');
+  });
+
+  it('refuse un destinataire invalide', async () => {
+    const alice = await registerTestUser(context.app);
+    const aliceSocket = await connect(alice.token);
+
+    const error = waitForEvent<{ code: string }>(aliceSocket, 'chat:error');
+    aliceSocket.emit('chat:start', { userId: 'identifiant-invalide' });
+
+    expect((await error).code).toBe('USER_UNAVAILABLE');
+  });
+
+  it('reflète un profil modifié après la connexion du socket', async () => {
+    const alice = await registerTestUser(context.app);
+    const bob = await registerTestUser(context.app);
+
+    const aliceSocket = await connect(alice.token);
+    const bobSocket = await connect(bob.token);
+
+    // Alice modifie son profil alors que son socket est déjà connecté.
+    await request(context.app)
+      .put('/api/users/me')
+      .set('Authorization', `Bearer ${alice.token}`)
+      .send({ displayName: 'Miora' });
+
+    const bobMatch = waitForEvent<MatchFoundEvent>(bobSocket, 'match:found');
+    const aliceMatch = waitForEvent<MatchFoundEvent>(aliceSocket, 'match:found');
+
+    aliceSocket.emit('queue:join');
+    bobSocket.emit('queue:join');
+
+    await Promise.all([aliceMatch, bobMatch]);
+
+    expect((await bobMatch).partner.displayName).toBe('Miora');
   });
 });

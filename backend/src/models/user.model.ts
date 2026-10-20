@@ -85,6 +85,8 @@ export interface PublicUserDto {
   id: string;
   pseudonym: string;
   role: UserRole;
+  /** Présent uniquement si l'utilisateur a explicitement choisi un nom affiché. */
+  displayName?: string;
   interests: string[];
   photoUrl?: string;
   location?: string;
@@ -97,12 +99,15 @@ export interface PrivateUserDto extends PublicUserDto {
 
 /**
  * Projection exposée publiquement : ni email ni hash de mot de passe.
+ * Le nom affiché et la photo n'apparaissent que s'ils ont été renseignés
+ * (anonymat par défaut).
  */
 export const toPublicUser = (user: User): PublicUserDto => ({
   id: String(user._id),
   pseudonym: user.pseudonym,
   role: user.role,
   interests: user.interests,
+  ...(user.displayName ? { displayName: user.displayName } : {}),
   ...(user.photoUrl ? { photoUrl: user.photoUrl } : {}),
   ...(user.location ? { location: user.location } : {}),
   createdAt: user.createdAt,

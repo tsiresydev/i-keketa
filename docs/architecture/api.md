@@ -17,15 +17,20 @@ Préfixe des routes REST : `/api`. Format d'erreur unique :
 
 `details` n'est présent que pour les erreurs de validation.
 
-## Endpoints REST (Sprint 1)
+## Endpoints REST
 
 | Méthode | Route | Auth | Description | Succès |
 |---------|-------|------|-------------|--------|
 | GET | /health | — | État du service | 200 `{ "status": "ok", "uptime": 12 }` |
-| POST | /api/auth/register | — | Inscription (email + mot de passe) | 201 `{ token, user }` |
+| POST | /api/auth/register | — | Inscription (email + mot de passe, profil facultatif) | 201 `{ token, user }` |
 | POST | /api/auth/login | — | Connexion (email + mot de passe) | 200 `{ token, user }` |
 | GET | /api/users/me | Bearer | Profil de l'utilisateur courant | 200 `{ user }` |
+| PUT | /api/users/me | Bearer | Mise à jour du profil (nom, intérêts, localisation) | 200 `{ user }` |
+| POST | /api/users/me/photo | Bearer | Envoi d'une photo de profil (`multipart/form-data`, champ `photo`) | 200 `{ user }` |
+| DELETE | /api/users/me/photo | Bearer | Suppression de la photo de profil | 200 `{ user }` |
+| GET | /api/users | Bearer | Annuaire des utilisateurs (filtres + pagination) | 200 `{ users, total, page, limit, totalPages }` |
 | GET | /api/chat/matches/:matchId/messages | Bearer | Historique d'une session de chat | 200 `{ matchId, messages }` |
+| GET | /uploads/photos/:fichier | — | Photo de profil servie en statique | 200 (image) |
 
 ### Objets renvoyés
 
@@ -37,12 +42,18 @@ Préfixe des routes REST : `/api`. Format d'erreur unique :
   "email": "rakoto@example.mg",
   "pseudonym": "Tsara-4KPQ",
   "role": "user",
-  "interests": [],
+  "displayName": "Miora",
+  "interests": ["musique"],
+  "photoUrl": "/uploads/photos/652f1a-....png",
+  "location": "Antananarivo",
   "createdAt": "2026-10-20T10:00:00.000Z"
 }
 ```
 
-Le partenaire ne reçoit jamais l'email : il ne voit que le `pseudonym` anonyme.
+`user` (public — annuaire et partenaire) : mêmes champs **sans `email`**.
+
+Le partenaire ne reçoit jamais l'email : il ne voit que le `pseudonym` anonyme. `displayName` et
+`photoUrl` n'apparaissent que si l'utilisateur les a explicitement renseignés (anonymat par défaut).
 
 `message` :
 
@@ -53,6 +64,59 @@ Le partenaire ne reçoit jamais l'email : il ne voit que le `pseudonym` anonyme.
   "senderId": "652f1a...",
   "content": "Salut, ça va ?",
   "createdAt": "2026-10-20T10:01:00.000Z"
+}
+```
+
+### Mise à jour du profil — `PUT /api/users/me`
+
+Corps JSON (champs facultatifs, seuls ceux fournis sont modifiés) :
+
+```json
+{
+  "displayName": "Miora",
+  "interests": ["musique", "voyage"],
+  "location": "Antananarivo"
+}
+```
+
+| Champ | Règles |
+|-------|--------|
+| `displayName` | 2 à 60 caractères, chaîne uniquement |
+| `interests` | 10 éléments maximum, 30 caractères par élément, dédupliqués sans tenir compte de la casse |
+| `location` | 2 à 120 caractères |
+
+Le corps est `strict` : un champ inconnu est refusé (`400`).
+
+### Photo de profil — `POST /api/users/me/photo`
+
+- `multipart/form-data`, un seul fichier dans le champ `photo`.
+- Types acceptés : `image/jpeg`, `image/png`, `image/webp`.
+- Taille maximale : 2 Mo (`PHOTO_MAX_SIZE_BYTES`).
+- Le type MIME **et** la signature binaire du fichier (magic bytes) sont vérifiés : un fichier
+  renommé est refusé (`400`).
+- La photo précédente est supprimée du stockage lors d'un remplacement.
+- Stockage local : `backend/uploads/photos/`, servi sur `/uploads` (hors périmètre de l'API `/api`).
+- `DELETE /api/users/me/photo` supprime la photo et le fichier associé.
+
+### Annuaire — `GET /api/users`
+
+| Paramètre | Type | Règles |
+|-----------|------|--------|
+| `q` | chaîne | ≤ 60 caractères, recherche sur `displayName` et `pseudonym` (insensible à la casse) |
+| `interests` | chaîne | Liste séparée par des virgules (10 maximum) ; un utilisateur correspond s'il partage au moins un intérêt |
+| `location` | chaîne | ≤ 120 caractères, correspondance partielle (insensible à la casse) |
+| `page` | entier | ≥ 1, défaut `1` |
+| `limit` | entier | 1 à 50, défaut `20` |
+
+L'utilisateur connecté n'apparaît jamais dans sa propre liste.
+
+```json
+{
+  "users": [{ "id": "652f1a...", "pseudonym": "Tsara-4KPQ", "displayName": "Miora", "interests": [], "createdAt": "2026-10-20T10:00:00.000Z" }],
+  "total": 1,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 1
 }
 ```
 
@@ -99,6 +163,7 @@ Une connexion sans jeton valide est rejetée (`connect_error`).
 | `queue:join` | — | Rejoint la file d'attente de mise en relation |
 | `queue:leave` | — | Quitte la file d'attente |
 | `chat:skip` | — | Termine la session en cours et rejoint la file d'attente |
+| `chat:start` | `{ userId }` | Démarre une discussion directe avec l'utilisateur ciblé |
 | `chat:message` | `{ matchId, content }` | Envoie un message texte |
 
 ### Événements serveur → client
@@ -106,11 +171,11 @@ Une connexion sans jeton valide est rejetée (`connect_error`).
 | Événement | Payload | Description |
 |-----------|---------|-------------|
 | `queue:status` | `{ status: 'idle' \| 'waiting', position? }` | État de la file d'attente |
-| `match:found` | `{ matchId, partner: { pseudonym } }` | Mise en relation effectuée |
+| `match:found` | `{ matchId, partner: { pseudonym, displayName?, photoUrl? } }` | Mise en relation effectuée (aléatoire ou directe) |
 | `match:ended` | `{ matchId, reason }` | Fin de session (`user_skipped`, `partner_disconnected`, `user_disconnected`) |
 | `chat:history` | `{ matchId, messages }` | Historique de la session (100 derniers messages) |
 | `chat:message` | `{ message }` | Message reçu (émis par l'expéditeur ou le partenaire) |
-| `chat:error` | `{ code, message }` | Erreur applicative (`INVALID_MESSAGE`, `NO_ACTIVE_MATCH`, `RATE_LIMITED`, `MESSAGE_FAILED`, `UNAUTHORIZED`) |
+| `chat:error` | `{ code, message }` | Erreur applicative (`INVALID_MESSAGE`, `NO_ACTIVE_MATCH`, `RATE_LIMITED`, `MESSAGE_FAILED`, `UNAUTHORIZED`, `USER_UNAVAILABLE`, `INVALID_TARGET`) |
 
 ### Règles temps réel
 
@@ -122,7 +187,26 @@ Une connexion sans jeton valide est rejetée (`connect_error`).
 - À la déconnexion d'un client, la session est clôturée (`partner_disconnected`) et le partenaire
   est prévenu.
 
+### Discussion directe — `chat:start`
+
+Le demandeur émet `chat:start` avec l'identifiant de l'utilisateur ciblé :
+
+```js
+socket.emit('chat:start', { userId: '652f1a...' });
+```
+
+Règles :
+
+- La cible doit être **connectée** (une session Socket.IO active) : sinon `chat:error`
+  avec le code `USER_UNAVAILABLE`.
+- La cible ne doit pas être déjà en discussion : sinon `chat:error` avec le code `USER_UNAVAILABLE`.
+- Le demandeur ne peut pas cibler son propre compte (`USER_UNAVAILABLE`).
+- En cas de succès, les deux participants reçoivent `match:found` avec le même `matchId`, puis
+  l'historique de la session via `chat:history` — exactement comme une mise en relation aléatoire.
+- Le demandeur quitte sa session précédente et la file d'attente avant la nouvelle session.
+
 ## Pagination / filtrage / tri
 
-Hors périmètre du Sprint 1. L'historique est limité aux 100 derniers messages d'une session.
-Les filtres utilisateurs (intérêts / localisation) arrivent au Sprint 2.
+- L'historique est limité aux 100 derniers messages d'une session.
+- L'annuaire des utilisateurs est paginé (`page`, `limit` ≤ 50) et filtrable par intérêts,
+  localisation ou recherche textuelle (voir `GET /api/users`).

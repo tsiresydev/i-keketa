@@ -3,7 +3,7 @@ import { UserModel, toPrivateUser, type PrivateUserDto } from '../../models/user
 import { ApiError } from '../../utils/api-error';
 import { burnPasswordComparison, hashPassword, verifyPassword } from '../../utils/password';
 import { signAccessToken } from '../../utils/jwt';
-import { generatePseudonym } from '../../utils/text';
+import { generatePseudonym, normalizeInterests } from '../../utils/text';
 import type { LoginInput, RegisterInput } from '../../schemas/auth.schema';
 
 export interface AuthResult {
@@ -30,8 +30,15 @@ const createUniquePseudonym = async (): Promise<string> => {
  * - L'email est normalisé en minuscules (unicité garantie par index unique).
  * - Le pseudonyme anonyme est généré par le serveur : l'utilisateur n'expose
  *   ni son email ni son identité à son partenaire de discussion.
+ * - Le profil (nom, centres d'intérêt, localisation) est facultatif.
  */
-export const registerUser = async ({ email, password }: RegisterInput): Promise<AuthResult> => {
+export const registerUser = async ({
+  email,
+  password,
+  displayName,
+  interests,
+  location,
+}: RegisterInput): Promise<AuthResult> => {
   const existingUser = await UserModel.exists({ email });
 
   if (existingUser) {
@@ -41,7 +48,14 @@ export const registerUser = async ({ email, password }: RegisterInput): Promise<
   const passwordHash = await hashPassword(password);
   const pseudonym = await createUniquePseudonym();
 
-  const user = await UserModel.create({ email, passwordHash, pseudonym });
+  const user = await UserModel.create({
+    email,
+    passwordHash,
+    pseudonym,
+    ...(displayName ? { displayName } : {}),
+    ...(interests && interests.length > 0 ? { interests: normalizeInterests(interests) } : {}),
+    ...(location ? { location } : {}),
+  });
 
   return {
     token: signAccessToken({ sub: String(user._id), email: user.email }),

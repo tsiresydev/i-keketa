@@ -1,4 +1,11 @@
-import type { AuthResponse, ChatMessage, CurrentUser } from '../types';
+import type {
+  AuthResponse,
+  ChatMessage,
+  CurrentUser,
+  ProfileUpdatePayload,
+  UserDirectoryResponse,
+  UserSearchFilters,
+} from '../types';
 
 export const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? '';
 
@@ -48,7 +55,8 @@ const request = async <T>(
 ): Promise<T> => {
   const headers = new Headers(init.headers);
 
-  if (init.body) {
+  // Le contenu d'un FormData est déjà encodé (multipart) : ne pas fixer le type.
+  if (init.body && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -80,10 +88,14 @@ const request = async <T>(
 };
 
 export const authApi = {
-  register: (email: string, password: string): Promise<AuthResponse> =>
+  register: (
+    email: string,
+    password: string,
+    profile?: ProfileUpdatePayload,
+  ): Promise<AuthResponse> =>
     request<AuthResponse>('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, ...(profile ?? {}) }),
     }),
 
   login: (email: string, password: string): Promise<AuthResponse> =>
@@ -106,4 +118,61 @@ export const chatApi = {
       { method: 'GET' },
       token,
     ),
+};
+
+export const profileApi = {
+  update: (token: string, payload: ProfileUpdatePayload): Promise<{ user: CurrentUser }> =>
+    request<{ user: CurrentUser }>(
+      '/api/users/me',
+      { method: 'PUT', body: JSON.stringify(payload) },
+      token,
+    ),
+
+  uploadPhoto: (token: string, file: File): Promise<{ user: CurrentUser }> => {
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    return request<{ user: CurrentUser }>(
+      '/api/users/me/photo',
+      { method: 'POST', body: formData },
+      token,
+    );
+  },
+
+  deletePhoto: (token: string): Promise<{ user: CurrentUser }> =>
+    request<{ user: CurrentUser }>('/api/users/me/photo', { method: 'DELETE' }, token),
+};
+
+export const usersApi = {
+  search: (token: string, filters: UserSearchFilters = {}): Promise<UserDirectoryResponse> => {
+    const params = new URLSearchParams();
+
+    if (filters.q) {
+      params.set('q', filters.q);
+    }
+
+    if (filters.interests && filters.interests.length > 0) {
+      params.set('interests', filters.interests.join(','));
+    }
+
+    if (filters.location) {
+      params.set('location', filters.location);
+    }
+
+    if (filters.page) {
+      params.set('page', String(filters.page));
+    }
+
+    if (filters.limit) {
+      params.set('limit', String(filters.limit));
+    }
+
+    const query = params.toString();
+
+    return request<UserDirectoryResponse>(
+      `/api/users${query ? `?${query}` : ''}`,
+      { method: 'GET' },
+      token,
+    );
+  },
 };

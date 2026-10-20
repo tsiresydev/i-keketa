@@ -1,27 +1,34 @@
-﻿import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+﻿import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Alert } from '../components/Alert';
+import { AppHeader } from '../components/AppHeader';
 import { ChatComposer } from '../components/ChatComposer';
 import { MessageBubble } from '../components/MessageBubble';
 import { useAuth } from '../hooks/use-auth';
 import { useChatSocket } from '../hooks/use-chat-socket';
 
 export const ChatPage = () => {
-  const { user, token, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, token } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const messageListRef = useRef<HTMLUListElement>(null);
+
+  const [pendingTarget, setPendingTarget] = useState<string | null>(null);
+  const searchKey = searchParams.toString();
 
   const {
     connectionStatus,
     chatStatus,
     matchId,
     partnerPseudonym,
+    partnerDisplayName,
+    partnerPhotoUrl,
     messages,
     error,
     notice,
     joinQueue,
     leaveQueue,
     skipPartner,
+    startDirectChat,
     sendMessage,
     clearError,
     clearNotice,
@@ -36,32 +43,33 @@ export const ChatPage = () => {
     }
   }, [messages]);
 
-  const handleLogout = (): void => {
-    leaveQueue();
-    logout();
-    navigate('/connexion', { replace: true });
-  };
+  // Cible d'une discussion directe demandée depuis la page « Découvrir ».
+  useEffect(() => {
+    const target = new URLSearchParams(searchKey).get('user');
+
+    if (target) {
+      setPendingTarget(target);
+    }
+  }, [searchKey]);
+
+  // La discussion directe est lancée dès que la connexion temps réel est prête.
+  useEffect(() => {
+    if (connectionStatus !== 'connected' || !pendingTarget) {
+      return;
+    }
+
+    setPendingTarget(null);
+    setSearchParams({}, { replace: true });
+    startDirectChat(pendingTarget);
+  }, [connectionStatus, pendingTarget, startDirectChat, setSearchParams]);
 
   const isMatched = chatStatus === 'matched' && matchId !== null;
+  const partnerName = partnerDisplayName ?? partnerPseudonym ?? '';
+  const partnerInitial = partnerName.slice(0, 1).toUpperCase();
 
   return (
     <div className="app-shell chat-page">
-      <header className="chat-header">
-        <span className="chat-header__brand">💬 I-Keketa</span>
-        <span className="chat-header__user">
-          <strong>{user?.pseudonym ?? 'Invité'}</strong>
-          <span>
-            <span
-              className={`status-dot ${connectionStatus === 'connected' ? 'status-dot--online' : ''}`}
-              aria-hidden="true"
-            />
-            {connectionStatus === 'connected' ? 'En ligne' : 'Hors ligne'}
-          </span>
-        </span>
-        <button type="button" className="button button--ghost" onClick={handleLogout}>
-          Déconnexion
-        </button>
-      </header>
+      <AppHeader connectionStatus={connectionStatus} />
 
       <main className="chat-main">
         {error ? (
@@ -79,8 +87,23 @@ export const ChatPage = () => {
         {isMatched ? (
           <>
             <div className="partner-bar">
+              {partnerPhotoUrl ? (
+                <img
+                  className="avatar avatar--md"
+                  src={partnerPhotoUrl}
+                  alt=""
+                  aria-hidden="true"
+                />
+              ) : (
+                <span className="avatar avatar--md avatar--placeholder" aria-hidden="true">
+                  {partnerInitial}
+                </span>
+              )}
               <span className="partner-bar__label">Discussion avec</span>
-              <span className="partner-bar__name">{partnerPseudonym}</span>
+              <span className="partner-bar__name">{partnerName}</span>
+              {partnerDisplayName && partnerPseudonym ? (
+                <span className="partner-bar__pseudonym">({partnerPseudonym})</span>
+              ) : null}
             </div>
 
             <ul

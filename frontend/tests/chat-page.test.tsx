@@ -84,9 +84,9 @@ const emit = async (event: string, payload?: unknown): Promise<void> => {
   });
 };
 
-const renderChatPage = async () => {
+const renderChatPage = async (initialEntry = '/chat') => {
   const view = render(
-    <MemoryRouter initialEntries={['/chat']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <AuthProvider>
         <ChatPage />
       </AuthProvider>
@@ -194,10 +194,49 @@ describe('Page de chat', () => {
     await user.click(await screen.findByRole('button', { name: 'Trouver quelqu’un' }));
     await emit('match:found', { matchId: 'match-1', partner: { pseudonym: 'Mety-CD34' } });
 
-    await user.click(await screen.findByRole('button', { name: 'Passer à quelqu’un d’autre' }));
+    await user.click(screen.getByRole('button', { name: 'Passer à quelqu’un d’autre' }));
 
     await waitFor(() => {
       expect(fakeSocket.emitted.some((entry) => entry.event === 'chat:skip')).toBe(true);
     });
+  });
+
+  it('démarre une discussion directe depuis le paramètre d’URL', async () => {
+    await renderChatPage('/chat?user=user-2');
+
+    await waitFor(() => {
+      const started = fakeSocket.emitted.find((entry) => entry.event === 'chat:start');
+      expect(started?.payload).toEqual({ userId: 'user-2' });
+    });
+  });
+
+  it('affiche le nom affiché du partenaire quand il est renseigné', async () => {
+    const user = userEvent.setup();
+    await renderChatPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Trouver quelqu’un' }));
+    await emit('match:found', {
+      matchId: 'match-1',
+      partner: { pseudonym: 'Mety-CD34', displayName: 'Miora', photoUrl: '/uploads/photos/a.png' },
+    });
+
+    expect(await screen.findByText('Miora')).toBeInTheDocument();
+    expect(screen.getByText('(Mety-CD34)')).toBeInTheDocument();
+  });
+
+  it('affiche l’erreur si la cible n’est pas disponible', async () => {
+    const user = userEvent.setup();
+    await renderChatPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Trouver quelqu’un' }));
+
+    await emit('chat:error', {
+      code: 'USER_UNAVAILABLE',
+      message: 'Cet utilisateur n’est pas connecté actuellement.',
+    });
+
+    expect(
+      await screen.findByText('Cet utilisateur n’est pas connecté actuellement.'),
+    ).toBeInTheDocument();
   });
 });

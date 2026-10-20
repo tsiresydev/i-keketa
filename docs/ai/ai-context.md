@@ -19,7 +19,7 @@ Plateforme web responsive de chat en ligne pour utilisateurs de Madagascar, perm
 5. Filtres de recherche (intérêts, localisation).
 6. Messagerie audiovisuelle (chat vidéo/audio).
 7. Signalement d'abus.
-8. Modération des discussions.
+
 
 ## Stack technique confirmée / à valider
 
@@ -66,12 +66,11 @@ Frontend + backend séparés; API REST (proposée) entre les deux; DB MongoDB. D
 
 - Sprint 1 (inscription/connexion, chat aléatoire, messagerie texte) : **implémenté et testé**.
 - Sprint 2 (profil utilisateur, filtres de recherche) : à démarrer.
-- Sprint 3 (messagerie audiovisuelle, signalement, modération) : à démarrer.
+- Sprint 3 (messagerie audiovisuelle, signalement) : à démarrer.
 
 ## Questions encore ouvertes
 
 - Stockage des médias (audio/vidéo) — à valider (Sprint 3).
-- Modération automatisée vs manuelle — à valider (Sprint 3).
 - Mise à l'échelle du temps réel multi-instance (file d'attente en mémoire) — à évaluer si le
   déploiement devient multi-instance.
 - Déploiement Vercel / Render : configuration à créer.

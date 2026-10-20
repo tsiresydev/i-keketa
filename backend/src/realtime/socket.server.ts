@@ -5,6 +5,7 @@ import { logger } from '../config/logger';
 import { verifyAccessToken } from '../utils/jwt';
 import { findUserById } from '../modules/auth/auth.service';
 import { messageContentSchema } from '../schemas/auth.schema';
+import { directChatSchema } from '../schemas/chat.schema';
 import { MatchmakingService, matchRoom } from '../modules/chat/matchmaking.service';
 import { saveMessage } from '../modules/chat/chat.service';
 import { sanitizeText } from '../utils/text';
@@ -13,6 +14,8 @@ export interface SocketUser {
   id: string;
   email: string;
   pseudonym: string;
+  displayName?: string;
+  photoUrl?: string;
 }
 
 /**
@@ -105,6 +108,8 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
         id: String(user._id),
         email: user.email,
         pseudonym: user.pseudonym,
+        ...(user.displayName ? { displayName: user.displayName } : {}),
+        ...(user.photoUrl ? { photoUrl: user.photoUrl } : {}),
       } satisfies SocketUser;
 
       return next();
@@ -117,6 +122,8 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
     const user = socket.data.user as SocketUser;
 
     logger.info('Client temps réel connecté.', { userId: user.id });
+
+    matchmaking.registerSocket(socket);
 
     socket.emit('queue:status', { status: 'idle' });
 
@@ -151,6 +158,22 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
       runSafely(async () => {
         await matchmaking.endMatch(user.id, 'user_skipped');
         await matchmaking.joinQueue(socket);
+      });
+    });
+
+    socket.on('chat:start', (payload: unknown) => {
+      runSafely(async () => {
+        const parsed = directChatSchema.safeParse(payload);
+
+        if (!parsed.success) {
+          socket.emit('chat:error', {
+            code: 'INVALID_TARGET',
+            message: 'Destinataire invalide.',
+          });
+          return;
+        }
+
+        await matchmaking.startDirectChat(socket, parsed.data.userId);
       });
     });
 

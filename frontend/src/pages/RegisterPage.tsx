@@ -4,7 +4,15 @@ import { Alert } from '../components/Alert';
 import { AuthLayout } from '../components/AuthLayout';
 import { FormField } from '../components/FormField';
 import { isAuthError, useAuth } from '../hooks/use-auth';
-import { validateEmail, validatePassword, validatePasswordConfirmation } from '../lib/validation';
+import {
+  parseInterests,
+  validateDisplayName,
+  validateEmail,
+  validateInterests,
+  validateLocation,
+  validatePassword,
+  validatePasswordConfirmation,
+} from '../lib/validation';
 
 export const RegisterPage = () => {
   const { register } = useAuth();
@@ -13,10 +21,16 @@ export const RegisterPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [interests, setInterests] = useState('');
+  const [location, setLocation] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
     passwordConfirmation?: string;
+    displayName?: string;
+    interests?: string;
+    location?: string;
   }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,18 +43,25 @@ export const RegisterPage = () => {
       email: validateEmail(email),
       password: validatePassword(password),
       passwordConfirmation: validatePasswordConfirmation(password, passwordConfirmation),
+      displayName: validateDisplayName(displayName),
+      interests: validateInterests(interests),
+      location: validateLocation(location),
     };
 
     setFieldErrors(errors);
 
-    if (errors.email || errors.password || errors.passwordConfirmation) {
+    if (Object.values(errors).some((message) => message !== undefined)) {
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      await register(email, password);
+      await register(email, password, {
+        displayName: displayName.trim(),
+        interests: parseInterests(interests),
+        location: location.trim(),
+      });
       navigate('/chat', { replace: true });
     } catch (error) {
       setFormError(
@@ -97,6 +118,44 @@ export const RegisterPage = () => {
           placeholder="••••••••"
           disabled={isSubmitting}
         />
+
+        <fieldset className="form-section">
+          <legend className="form-section__legend">Profil (facultatif)</legend>
+          <p className="form-field__hint">
+            Ces informations sont facultatives. Sans nom affiché, vous restez anonyme.
+          </p>
+
+          <FormField
+            label="Nom affiché"
+            value={displayName}
+            onChange={setDisplayName}
+            error={fieldErrors.displayName}
+            placeholder="Miora"
+            disabled={isSubmitting}
+            required={false}
+          />
+
+          <FormField
+            label="Centres d’intérêt"
+            value={interests}
+            onChange={setInterests}
+            error={fieldErrors.interests}
+            hint="Séparez-les par des virgules (10 maximum)."
+            placeholder="musique, voyage, cuisine"
+            disabled={isSubmitting}
+            required={false}
+          />
+
+          <FormField
+            label="Localisation"
+            value={location}
+            onChange={setLocation}
+            error={fieldErrors.location}
+            placeholder="Antananarivo"
+            disabled={isSubmitting}
+            required={false}
+          />
+        </fieldset>
 
         <button type="submit" className="button" disabled={isSubmitting}>
           {isSubmitting ? 'Création…' : 'Créer mon compte'}

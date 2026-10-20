@@ -85,12 +85,17 @@ Schéma flexible (NoSQL) : pas de migration SQL nécessaire. Les modèles Mongoo
 au démarrage (`autoIndex` actif en développement). En production, appliquer les index explicitement
 lors du déploiement si `autoIndex` y est désactivé.
 
-Les champs `displayName`, `interests`, `photoUrl` et `location` sont déjà présents dans le modèle
-`User` pour préparer le Sprint 2 ; ils ne sont ni renseignés ni exposés par l'API du Sprint 1
-(hormis `interests`, renvoyé vide).
+Les champs `displayName`, `interests`, `photoUrl` et `location` sont utilisés depuis le Sprint 2 :
+ils sont renseignés via `PUT /api/users/me` (ou à l'inscription) et exposés par l'annuaire
+(`GET /api/users`). `photoUrl` pointe vers le fichier stocké localement et servi sur `/uploads`
+(le binaire lui-même n'est pas en base).
 
 ## Opérations sur les données sensibles
 
 - `passwordHash` est marqué `select: false` : il n'est chargé que lors de la connexion.
 - Les projections `toPublicUser` / `toPrivateUser` contrôlent les champs exposés par l'API.
 - L'email n'est jamais transmis au partenaire (seul le `pseudonym` l'est).
+- `displayName` et `photoUrl` ne sont exposés publiquement que s'ils ont été explicitement
+  renseignés par l'utilisateur (anonymat par défaut).
+- Les photos sont servies en statique sur `/uploads` : les noms de fichiers sont non devinables
+  (identifiant de l'utilisateur + UUID), et le dossier de stockage n'est pas versionné.

@@ -1,6 +1,7 @@
 export interface PublicUser {
   id: string;
   pseudonym: string;
+  displayName?: string;
   role: 'user' | 'moderator' | 'admin';
   interests: string[];
   photoUrl?: string;
@@ -17,6 +18,28 @@ export interface AuthResponse {
   user: CurrentUser;
 }
 
+export interface UserDirectoryResponse {
+  users: PublicUser[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface UserSearchFilters {
+  q?: string;
+  interests?: string[];
+  location?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ProfileUpdatePayload {
+  displayName?: string;
+  interests?: string[];
+  location?: string;
+}
+
 export interface ChatMessage {
   id: string;
   matchId: string;
@@ -25,11 +48,19 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+/**
+ * Profil du partenaire : le nom affiché et la photo ne sont présents
+ * que si l'utilisateur les a explicitement renseignés (anonymat par défaut).
+ */
+export interface PartnerProfile {
+  pseudonym: string;
+  displayName?: string;
+  photoUrl?: string;
+}
+
 export interface MatchFoundPayload {
   matchId: string;
-  partner: {
-    pseudonym: string;
-  };
+  partner: PartnerProfile;
 }
 
 export interface MatchEndedPayload {
