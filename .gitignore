@@ -1,0 +1,33 @@
+# Dépendances
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Environnement (secrets — ne jamais commiter)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Système
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Cache
+.cache/
+.vite/
+.mongodb-binaries/
