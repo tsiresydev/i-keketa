@@ -3,7 +3,6 @@ import type { Server, Socket } from 'socket.io';
 import { logger } from '../../config/logger';
 import { MatchModel, type MatchEndReason } from '../../models/match.model';
 import { MessageModel } from '../../models/message.model';
-import { UserModel } from '../../models/user.model';
 
 /**
  * Identité minimale d'un visiteur connecté, transmise via `socket.data.user`.
@@ -289,16 +288,15 @@ export class MatchmakingService {
   ): Promise<void> {
     const joiningUser = joiningSocket.data.user as SocketIdentity;
 
-    const [joiningProfile, partnerProfile] = await Promise.all([
-      this.loadProfile(joiningUser.id),
-      this.loadProfile(partner.userId),
-    ]);
+    const joiningProfile: PartnerProfile = { displayName: joiningUser.displayName };
+    const partnerProfile: PartnerProfile = { displayName: partner.displayName };
 
     let match;
 
     try {
       match = await MatchModel.create({
         participants: [new Types.ObjectId(joiningUser.id), new Types.ObjectId(partner.userId)],
+        participantDisplayNames: [joiningUser.displayName, partner.displayName],
         status: 'active',
       });
     } catch (error) {
@@ -346,29 +344,6 @@ export class MatchmakingService {
     await this.sendHistory(partnerSocket, matchId);
 
     logger.info('Mise en relation effectuée.', { matchId });
-  }
-
-  /**
-   * Relit le nom affiché d'un visiteur en base : il est transmis au partenaire
-   * au moment de la mise en relation.
-   */
-  private async loadProfile(userId: string): Promise<PartnerProfile> {
-    try {
-      const user = await UserModel.findById(userId).select('displayName');
-
-      if (!user) {
-        return { displayName: 'Anonyme' };
-      }
-
-      return { displayName: user.displayName };
-    } catch (error) {
-      logger.error('Impossible de charger le profil du partenaire.', {
-        userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      return { displayName: 'Anonyme' };
-    }
   }
 
   /**

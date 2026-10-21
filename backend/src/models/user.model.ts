@@ -14,8 +14,6 @@ export interface User {
   _id: Types.ObjectId;
   /** Identifiant technique anonyme, généré par le serveur. */
   pseudonym: string;
-  /** Nom affiché choisi par le visiteur à chaque nouvelle session. */
-  displayName: string;
   role: UserRole;
   createdAt: Date;
   updatedAt: Date;
@@ -29,12 +27,6 @@ const userSchema = new Schema<User>(
       type: String,
       required: true,
       unique: true,
-      trim: true,
-      maxlength: 40,
-    },
-    displayName: {
-      type: String,
-      required: true,
       trim: true,
       maxlength: 40,
     },
@@ -54,19 +46,17 @@ export const UserModel: Model<User> = model<User>('User', userSchema);
 
 export interface PublicUserDto {
   id: string;
-  /** Nom affiché choisi par le visiteur : c'est le seul nom visible du partenaire. */
-  displayName: string;
   role: UserRole;
   createdAt: Date;
 }
 
 /**
  * Projection exposée publiquement : ni email, ni mot de passe, ni identifiant
- * technique anonyme.
+ * technique anonyme, ni nom affiché (celui-ci voyage dans le jeton de session).
  */
-export const toPublicUser = (user: User): PublicUserDto => ({
+export const toPublicUser = (user: User, displayName?: string): PublicUserDto & { displayName?: string } => ({
   id: String(user._id),
-  displayName: user.displayName,
+  ...(displayName ? { displayName } : {}),
   role: user.role,
   createdAt: user.createdAt,
 });

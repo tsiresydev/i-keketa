@@ -119,7 +119,7 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
 
       socket.data.user = {
         id: String(user._id),
-        displayName: user.displayName,
+        displayName: payload.displayName,
       } satisfies SocketUser;
 
       return next();

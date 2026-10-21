@@ -1,7 +1,6 @@
 import { Types } from 'mongoose';
 import { ReportModel, toReportDto, type ReportDto } from '../../models/report.model';
 import { MatchModel } from '../../models/match.model';
-import { UserModel } from '../../models/user.model';
 import { ApiError } from '../../utils/api-error';
 import { sanitizeText } from '../../utils/text';
 import type { ReportCreateInput } from '../../schemas/media.schema';
@@ -66,6 +65,14 @@ export const createReport = async (
 
   const details = input.details ? sanitizeText(input.details) : undefined;
 
+  // Le nom affiché du partenaire n'est pas persisté dans la collection
+  // des utilisateurs : il est relu depuis la session de chat, où il a été
+  // figé au moment de la mise en relation.
+  const match = await MatchModel.findById(input.matchId).select('participants participantDisplayNames');
+  const partnerIndex = match?.participants.findIndex((participant) => String(participant) === partnerId) ?? -1;
+  const reportedDisplayName =
+    partnerIndex >= 0 ? (match?.participantDisplayNames?.[partnerIndex] ?? 'Anonyme') : 'Anonyme';
+
   const report = await ReportModel.create({
     reporterId: new Types.ObjectId(userId),
     reportedId: new Types.ObjectId(partnerId),
@@ -73,13 +80,12 @@ export const createReport = async (
     reason: input.reason,
     ...(details ? { details } : {}),
     status: 'pending',
+    reportedDisplayName,
   });
-
-  const partner = await UserModel.findById(partnerId).select('displayName');
 
   return {
     ...toReportDto(report),
-    reportedDisplayName: partner?.displayName ?? 'Anonyme',
+    reportedDisplayName,
   };
 };
 
@@ -94,16 +100,8 @@ export const listOwnReports = async (userId: string): Promise<ReportWithPartner[
     .sort({ createdAt: -1 })
     .limit(100);
 
-  const partners = await UserModel.find({
-    _id: { $in: reports.map((report) => report.reportedId) },
-  }).select('displayName');
-
-  const displayNameById = new Map(
-    partners.map((user) => [String(user._id), user.displayName as string]),
-  );
-
   return reports.map((report) => ({
     ...toReportDto(report),
-    reportedDisplayName: displayNameById.get(String(report.reportedId)) ?? 'Anonyme',
+    reportedDisplayName: report.reportedDisplayName,
   }));
 };

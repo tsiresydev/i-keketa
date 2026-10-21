@@ -3,10 +3,21 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './config/logger';
 import { connectDatabase, disconnectDatabase } from './db/connect';
+import { UserModel } from './models/user.model';
+import { MatchModel } from './models/match.model';
+import { ReportModel } from './models/report.model';
 import { createRealtimeServer } from './realtime/socket.server';
 
 const start = async (): Promise<void> => {
   await connectDatabase();
+
+  // Synchronise les index MongoDB avec les schémas Mongoose : supprime les
+  // index uniques obsolètes (ex. email) qui provoquaient des 409 intempestifs.
+  await Promise.all([
+    UserModel.syncIndexes(),
+    MatchModel.syncIndexes(),
+    ReportModel.syncIndexes(),
+  ]);
 
   const app = createApp();
   const httpServer = createServer(app);

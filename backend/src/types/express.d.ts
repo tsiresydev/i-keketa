@@ -5,6 +5,8 @@ declare global {
     interface Request {
       /** Utilisateur authentifié, présent après le middleware `authenticate`. */
       user?: UserDocument;
+      /** Nom affiché porté par le jeton de session (jamais persisté en base). */
+      displayName?: string;
     }
   }
 }

@@ -2,7 +2,6 @@ import type { Request, Response } from 'express';
 import { createSession } from './auth.service';
 import { asyncHandler } from '../../utils/async-handler';
 import { ApiError } from '../../utils/api-error';
-import { toPublicUser } from '../../models/user.model';
 
 export const createSessionController = asyncHandler(async (req: Request, res: Response) => {
   const result = await createSession(req.body);
@@ -15,5 +14,12 @@ export const currentSessionController = asyncHandler(async (req: Request, res: R
     throw ApiError.unauthorized('Authentification requise.');
   }
 
-  res.status(200).json({ user: toPublicUser(req.user) });
+  res.status(200).json({
+    user: {
+      id: String(req.user._id),
+      displayName: req.displayName ?? '',
+      role: req.user.role,
+      createdAt: req.user.createdAt,
+    },
+  });
 });

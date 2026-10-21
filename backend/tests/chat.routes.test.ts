@@ -15,6 +15,7 @@ describe('GET /api/chat/matches/:matchId/messages', () => {
 
     const match = await MatchModel.create({
       participants: [new Types.ObjectId(alice.userId), new Types.ObjectId(bob.userId)],
+      participantDisplayNames: [alice.displayName ?? 'Anonyme', bob.displayName ?? 'Anonyme'],
       status: 'active',
     });
 
@@ -41,6 +42,7 @@ describe('GET /api/chat/matches/:matchId/messages', () => {
 
     const match = await MatchModel.create({
       participants: [new Types.ObjectId(alice.userId), new Types.ObjectId(bob.userId)],
+      participantDisplayNames: [alice.displayName ?? 'Anonyme', bob.displayName ?? 'Anonyme'],
       status: 'active',
     });
 

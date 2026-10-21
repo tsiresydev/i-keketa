@@ -34,6 +34,8 @@ export interface Report {
   reason: ReportReason;
   details?: string;
   status: ReportStatus;
+  /** Nom affiché du partenaire au moment du signalement (figé, non persisté côté User). */
+  reportedDisplayName: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -76,6 +78,12 @@ const reportSchema = new Schema<Report>(
       default: 'pending',
       index: true,
     },
+    reportedDisplayName: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 40,
+    },
   },
   {
     timestamps: true,
@@ -95,6 +103,7 @@ export interface ReportDto {
   reason: ReportReason;
   details?: string;
   status: ReportStatus;
+  reportedDisplayName: string;
   createdAt: Date;
 }
 
@@ -104,5 +113,6 @@ export const toReportDto = (report: Report): ReportDto => ({
   reason: report.reason,
   ...(report.details ? { details: report.details } : {}),
   status: report.status,
+  reportedDisplayName: report.reportedDisplayName,
   createdAt: report.createdAt,
 });

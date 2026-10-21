@@ -37,6 +37,7 @@ export const authenticate = async (
     }
 
     req.user = user;
+    req.displayName = payload.displayName;
     next();
   } catch (error) {
     next(error instanceof ApiError ? error : ApiError.unauthorized('Authentification requise.'));

@@ -13,6 +13,7 @@ export type MatchEndReason = (typeof MATCH_END_REASONS)[number];
 export interface Match {
   _id: Types.ObjectId;
   participants: Types.ObjectId[];
+  participantDisplayNames: string[];
   status: MatchStatus;
   endedAt?: Date;
   endedReason?: MatchEndReason;
@@ -31,6 +32,14 @@ const matchSchema = new Schema<Match>(
       validate: {
         validator: (participants: Types.ObjectId[]) => participants.length === 2,
         message: 'Une session de chat doit compter exactement deux participants.',
+      },
+    },
+    participantDisplayNames: {
+      type: [String],
+      required: true,
+      validate: {
+        validator: (names: string[]) => names.length === 2,
+        message: 'Une session de chat doit compter exactement deux noms affichés.',
       },
     },
     status: {

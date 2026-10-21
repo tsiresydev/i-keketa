@@ -22,9 +22,14 @@ afterAll(() => {
   rateLimits.reportMax = previousReportMax;
 });
 
-const createMatch = async (aliceId: string, bobId: string): Promise<string> => {
+const createMatch = async (
+  aliceId: string,
+  bobId: string,
+  names: [string, string] = ['Anonyme', 'Anonyme'],
+): Promise<string> => {
   const match = await MatchModel.create({
     participants: [new Types.ObjectId(aliceId), new Types.ObjectId(bobId)],
+    participantDisplayNames: names,
     status: 'active',
   });
 
@@ -35,7 +40,7 @@ describe('POST /api/reports', () => {
   it('enregistre un signalement avec le partenaire comme utilisateur signalé', async () => {
     const alice = await createTestSession(app, { displayName: 'Miora' });
     const bob = await createTestSession(app, { displayName: 'Rakoto' });
-    const matchId = await createMatch(alice.userId, bob.userId);
+    const matchId = await createMatch(alice.userId, bob.userId, ['Miora', 'Rakoto']);
 
     const response = await request(app)
       .post('/api/reports')
@@ -113,6 +118,7 @@ describe('POST /api/reports', () => {
 
     const match = await MatchModel.create({
       participants: [new Types.ObjectId(alice.userId), new Types.ObjectId(bob.userId)],
+      participantDisplayNames: ['Anonyme', 'Anonyme'],
       status: 'ended',
     });
 

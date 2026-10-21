@@ -3,14 +3,15 @@ import { signAccessToken, verifyAccessToken } from '../../src/utils/jwt';
 
 describe('utils/jwt', () => {
   it('signe et vérifie un jeton', () => {
-    const token = signAccessToken({ sub: 'abc123' });
+    const token = signAccessToken({ sub: 'abc123', displayName: 'Rakoto' });
     const payload = verifyAccessToken(token);
 
     expect(payload.sub).toBe('abc123');
+    expect(payload.displayName).toBe('Rakoto');
   });
 
   it('rejette un jeton falsifié', () => {
-    const token = signAccessToken({ sub: 'abc123' });
+    const token = signAccessToken({ sub: 'abc123', displayName: 'Rakoto' });
     const tampered = `${token.slice(0, -2)}xx`;
 
     expect(() => verifyAccessToken(tampered)).toThrowError(/invalide/i);

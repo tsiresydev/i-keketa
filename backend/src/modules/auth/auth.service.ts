@@ -1,12 +1,17 @@
 import { Types } from 'mongoose';
-import { UserModel, toPublicUser, type PublicUserDto } from '../../models/user.model';
+import { UserModel } from '../../models/user.model';
 import { signAccessToken } from '../../utils/jwt';
 import { generatePseudonym } from '../../utils/text';
 import type { SessionInput } from '../../schemas/auth.schema';
 
 export interface SessionResult {
   token: string;
-  user: PublicUserDto;
+  user: {
+    id: string;
+    displayName: string;
+    role: 'user' | 'moderator' | 'admin';
+    createdAt: Date;
+  };
 }
 
 const createUniquePseudonym = async (): Promise<string> => {
@@ -23,22 +28,25 @@ const createUniquePseudonym = async (): Promise<string> => {
 
 /**
  * Ouvre une session de discussion à partir du seul nom affiché saisi par le
- * visiteur : aucun compte, aucun email, aucun mot de passe.
- *
- * Le pseudonyme anonyme est généré par le serveur et reste interne ; le
- * partenaire ne voit que le nom affiché choisi par le visiteur.
+ * visiteur : aucun compte, aucun email, aucun mot de passe, et le nom affiché
+ * n'est pas persisté — il voyage dans le jeton de session, ce qui permet à
+ * plusieurs visiteurs de partager le même nom.
  */
 export const createSession = async ({ displayName }: SessionInput): Promise<SessionResult> => {
   const pseudonym = await createUniquePseudonym();
 
   const user = await UserModel.create({
     pseudonym,
-    displayName,
   });
 
   return {
-    token: signAccessToken({ sub: String(user._id) }),
-    user: toPublicUser(user),
+    token: signAccessToken({ sub: String(user._id), displayName }),
+    user: {
+      id: String(user._id),
+      displayName,
+      role: user.role,
+      createdAt: user.createdAt,
+    },
   };
 };
 
