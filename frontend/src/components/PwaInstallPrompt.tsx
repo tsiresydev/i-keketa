@@ -14,6 +14,20 @@ export const PwaInstallPrompt = () => {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    // L'installation n'est proposée que sur les appareils mobiles.
+    const isMobile =
+      /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(navigator.userAgent) ||
+      window.matchMedia('(max-width: 768px)').matches;
+
+    if (!isMobile) {
+      return;
+    }
+
+    // Ne rien proposer si l'application est déjà installée.
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      return;
+    }
+
     const handleBeforeInstall = (event: Event) => {
       event.preventDefault();
       setDeferredPrompt(event as BeforeInstallPromptEvent);
