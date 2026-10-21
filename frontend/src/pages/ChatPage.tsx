@@ -1,15 +1,12 @@
-﻿import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef } from 'react';
 import { Alert } from '../components/Alert';
 import { AppHeader } from '../components/AppHeader';
 import { ChatComposer } from '../components/ChatComposer';
 import { MessageBubble } from '../components/MessageBubble';
-import { ReportDialog } from '../components/ReportDialog';
 import { VideoCallPanel } from '../components/VideoCallPanel';
 import { useSession } from '../hooks/use-session';
 import { useChatSocket } from '../hooks/use-chat-socket';
 import { useMediaCall } from '../hooks/use-media-call';
-import { reportsApi } from '../lib/api-client';
-import type { ReportReason } from '../types';
 
 export const ChatPage = () => {
   const { user, token } = useSession();
@@ -50,11 +47,6 @@ export const ChatPage = () => {
     clearError: clearCallError,
     clearNotice: clearCallNotice,
   } = useMediaCall(socket, matchId);
-
-  const [isReportOpen, setIsReportOpen] = useState(false);
-  const [isReporting, setIsReporting] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
-  const [reportSuccess, setReportSuccess] = useState<string | null>(null);
 
   /** Session de chat pour laquelle l'appel vidéo a déjà été lancé. */
   const autoCallMatchRef = useRef<string | null>(null);
@@ -102,34 +94,6 @@ export const ChatPage = () => {
     }
   }, [messages]);
 
-  const handleReport = async (reason: ReportReason, details: string): Promise<void> => {
-    if (!token || !matchId) {
-      return;
-    }
-
-    setIsReporting(true);
-    setReportError(null);
-
-    try {
-      await reportsApi.create(token, {
-        matchId,
-        reason,
-        ...(details ? { details } : {}),
-      });
-
-      setIsReportOpen(false);
-      setReportSuccess('Signalement envoyé. Merci de nous avoir alertés.');
-    } catch (submitError) {
-      setReportError(
-        submitError instanceof Error
-          ? submitError.message
-          : 'Le signalement n’a pas pu être envoyé.',
-      );
-    } finally {
-      setIsReporting(false);
-    }
-  };
-
   const isMatched = chatStatus === 'matched' && matchId !== null;
   const partnerName = partnerDisplayName ?? '';
   const partnerInitial = partnerName.slice(0, 1).toUpperCase();
@@ -164,12 +128,6 @@ export const ChatPage = () => {
           </Alert>
         ) : null}
 
-        {reportSuccess ? (
-          <Alert variant="notice" onClose={() => setReportSuccess(null)}>
-            {reportSuccess}
-          </Alert>
-        ) : null}
-
         {isMatched ? (
           <>
             <div className="partner-bar">
@@ -187,16 +145,6 @@ export const ChatPage = () => {
                   disabled={isCallActive || connectionStatus !== 'connected'}
                 >
                   📹 Lancer le match
-                </button>
-                <button
-                  type="button"
-                  className="button button--ghost"
-                  onClick={() => {
-                    setReportError(null);
-                    setIsReportOpen(true);
-                  }}
-                >
-                  🚩 Signaler
                 </button>
               </span>
             </div>
@@ -280,15 +228,6 @@ export const ChatPage = () => {
           </button>
         </footer>
       ) : null}
-
-      <ReportDialog
-        open={isReportOpen}
-        partnerName={partnerName}
-        isSubmitting={isReporting}
-        error={reportError}
-        onSubmit={(reason, details) => void handleReport(reason, details)}
-        onClose={() => setIsReportOpen(false)}
-      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-# API — Plateforme de Chat
+﻿# API — Plateforme de Chat
 
 ## Vue d'ensemble
 
@@ -10,7 +10,7 @@ Préfixe des routes REST : `/api`. Format d'erreur unique :
   "error": {
     "code": "BAD_REQUEST",
     "message": "Données invalides.",
-    "details": [{ "field": "email", "message": "L’adresse email doit être valide." }]
+    "details": [{ "field": "displayName", "message": "Le nom affiché doit contenir au moins 2 caractères." }]
   }
 }
 ```
@@ -25,8 +25,6 @@ Préfixe des routes REST : `/api`. Format d'erreur unique :
 | POST | /api/auth/session | — | Ouvre une session anonyme à partir du seul nom affiché | 201 `{ token, user }` |
 | GET | /api/auth/session | Bearer | Session courante | 200 `{ user }` |
 | GET | /api/chat/matches/:matchId/messages | Bearer | Historique d'une session de chat | 200 `{ matchId, messages }` |
-| POST | /api/reports | Bearer | Signalement d'abus du partenaire de la session | 201 `{ report }` |
-| GET | /api/reports/me | Bearer | Signalements émis par l'utilisateur courant | 200 `{ reports }` |
 
 ### Objets renvoyés
 
@@ -42,7 +40,7 @@ Préfixe des routes REST : `/api`. Format d'erreur unique :
 ```
 
 Le pseudonyme technique anonyme (`pseudonym`) n'est **jamais** exposé : il reste interne au serveur
-(journalisation, signalements). Le partenaire ne voit que le `displayName` choisi par le visiteur.
+(journalisation). Le partenaire ne voit que le `displayName` choisi par le visiteur.
 
 `message` :
 
@@ -53,20 +51,6 @@ Le pseudonyme technique anonyme (`pseudonym`) n'est **jamais** exposé : il rest
   "senderId": "652f1a...",
   "content": "Salut, ça va ?",
   "createdAt": "2026-10-20T10:01:00.000Z"
-}
-```
-
-`report` :
-
-```json
-{
-  "id": "652f1d...",
-  "matchId": "652f1c...",
-  "reason": "harassment",
-  "details": "Insistances déplacées.",
-  "status": "pending",
-  "reportedDisplayName": "Mety-CD34",
-  "createdAt": "2026-10-20T10:05:00.000Z"
 }
 ```
 
@@ -101,37 +85,8 @@ Réponse `201` :
 Retourne la session associée au jeton Bearer (`200 { user }`), ou `401` si le jeton est absent,
 invalide ou expiré.
 
-### Signalement d'abus — `POST /api/reports`
-
-Corps JSON :
-
-```json
-{
-  "matchId": "652f1c...",
-  "reason": "harassment",
-  "details": "Insistances déplacées."
-}
-```
-
-| Champ | Type | Règles |
-|-------|------|--------|
-| `matchId` | chaîne | Identifiant de la session de chat (obligatoire) |
-| `reason` | énumération | `harassment`, `inappropriate_content`, `nudity`, `spam`, `scam`, `other` |
-| `details` | chaîne | Facultatif, 1000 caractères maximum (`REPORT_DETAILS_MAX_LENGTH`) |
-
-Règles :
-
-- L'utilisateur signalé est **toujours l'autre participant** de la session : le client ne peut pas
-  désigner une tierce personne (`reportedId` est dérivé côté serveur).
-- Seuls les participants actifs d'une session peuvent signaler : sinon `404`.
-- Un seul signalement par auteur et par session : un doublon renvoie `409`.
-- Le signalement est enregistré avec le statut `pending` : la modération (consultation, traitement,
-  sanction) **n'est pas implémentée**, aucun outil de traitement n'est exposé.
-- L'utilisateur ne consulte que ses propres signalements (`GET /api/reports/me`, 100 derniers).
-- Limitation de débit dédiée : `REPORT_RATE_LIMIT_MAX` signalements par
-  `REPORT_RATE_LIMIT_WINDOW_MS` (`429`).
-
 ### Règles de validation
+
 - `displayName` (session) : 2 à 40 caractères, chaîne uniquement.
 - `matchId` : identifiant MongoDB de la session de chat.
 - Corps JSON limité à 32 Ko ; les champs inconnus sont refusés sur les messages et sur
@@ -141,18 +96,16 @@ Règles :
 
 | Code | Signification | Cas |
 |------|---------------|-----|
-| 200 | Succès | Session courante, historique, signalements |
-| 201 | Ressource créée | Ouverture de session, signalement |
+| 200 | Succès | Session courante, historique |
+| 201 | Ressource créée | Ouverture de session |
 | 400 | Requête invalide | Validation Zod, corps malformé |
 | 401 | Non authentifié | Jeton absent, invalide ou expiré |
 | 403 | Interdit | Accès à l'historique d'une session dont on ne fait pas partie |
-| 404 | Introuvable | Route inconnue, session de chat inexistante, session non signalable |
-| 409 | Conflit | Signalement déjà envoyé pour cette session |
+| 404 | Introuvable | Route inconnue, session de chat inexistante |
 | 429 | Trop de requêtes | Limitation de débit |
 | 500 | Erreur interne | Détails journalisés côté serveur uniquement |
 
-La limitation de débit s'applique à l'ouverture de session (`authLimiter`) et aux signalements
-(`reportLimiter`).
+La limitation de débit s'applique à l'ouverture de session (`authLimiter`).
 
 ## WebSocket (Socket.IO)
 
@@ -186,7 +139,7 @@ Une connexion sans jeton valide est rejetée (`connect_error`).
 | Événement | Payload | Description |
 |-----------|---------|-------------|
 | `queue:status` | `{ status: 'idle' \| 'waiting', position? }` | État de la file d'attente |
-| `match:found` | `{ matchId, partner: { displayName } }` | Mise en relation effectuée (aléatoire uniquement) |
+| `match:found` | `{ matchId, partner: { displayName } }` | Mise en relation effectuée |
 | `match:ended` | `{ matchId, reason }` | Fin de session (`user_skipped`, `partner_disconnected`, `user_disconnected`) |
 | `chat:history` | `{ matchId, messages }` | Historique de la session (100 derniers messages) |
 | `chat:message` | `{ message }` | Message reçu (émis par l'expéditeur ou le partenaire) |
@@ -253,12 +206,6 @@ Règles :
 - Serveurs ICE : `VITE_STUN_URLS` côté frontend (liste séparée par des virgules), par défaut
   `stun:stun.l.google.com:19302`. Aucun serveur TURN n'est configuré : la connectivité peut donc
   échouer sur des réseaux restrictifs.
-
-### Discussion directe — `chat:start`
-
-Supprimée dans la refonte : aucune discussion directe ciblée n'est proposée. La mise en relation se
-fait uniquement via la file d'attente aléatoire (`queue:join`). Le serveur ignore l'événement
-`chat:start` s'il est émis.
 
 ## Pagination / filtrage / tri
 

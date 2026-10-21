@@ -5,7 +5,6 @@ import morgan from 'morgan';
 import { env } from './config/env';
 import { authRouter } from './modules/auth/auth.routes';
 import { chatRouter } from './modules/chat/chat.routes';
-import { reportRouter } from './modules/reports/report.routes';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { globalLimiter } from './middleware/rate-limiters';
 
@@ -40,7 +39,6 @@ export const createApp = (): Express => {
   app.use('/api', globalLimiter);
   app.use('/api/auth', authRouter);
   app.use('/api/chat', chatRouter);
-  app.use('/api/reports', reportRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

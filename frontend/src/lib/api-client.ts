@@ -1,4 +1,4 @@
-import type { AuthResponse, ChatMessage, PublicUser, Report, ReportCreatePayload } from '../types';
+import type { AuthResponse, ChatMessage, PublicUser } from '../types';
 
 export const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? '';
 
@@ -101,16 +101,4 @@ export const chatApi = {
       { method: 'GET' },
       token,
     ),
-};
-
-export const reportsApi = {
-  create: (token: string, payload: ReportCreatePayload): Promise<{ report: Report }> =>
-    request<{ report: Report }>(
-      '/api/reports',
-      { method: 'POST', body: JSON.stringify(payload) },
-      token,
-    ),
-
-  listOwn: (token: string): Promise<{ reports: Report[] }> =>
-    request<{ reports: Report[] }>('/api/reports/me', { method: 'GET' }, token),
 };

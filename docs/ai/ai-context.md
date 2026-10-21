@@ -8,8 +8,7 @@ Plateforme web responsive de chat en ligne pour utilisateurs de Madagascar, perm
 
 - **Objectif** : faciliter les rencontres amicales entre utilisateurs de Madagascar, expérience fluide/intuitive, sécurité et confidentialité.
 - **Périmètre inclus** : session anonyme sans compte (aucun email ni mot de passe), chat aléatoire,
-  messagerie texte temps réel, messagerie audiovisuelle, signalement d'abus, modération, déploiement
-  Vercel/Render.
+  messagerie texte temps réel, messagerie audiovisuelle, déploiement Vercel/Render.
 - **Périmètre exclu** : inscription/connexion classiques, profil utilisateur et photo, filtres de
   recherche, annuaire des utilisateurs, discussion directe entre deux utilisateurs ciblés (hors file
   d'attente aléatoire).
@@ -20,8 +19,6 @@ Plateforme web responsive de chat en ligne pour utilisateurs de Madagascar, perm
 2. Mise en relation aléatoire entre visiteurs.
 3. Messagerie texte en temps réel.
 4. Messagerie audiovisuelle (chat vidéo/audio) avec appel automatique après la mise en relation.
-5. Signalement d'abus.
-6. Modération (hors périmètre : aucun outil de traitement).
 
 
 ## Stack technique confirmée / à valider
@@ -79,11 +76,6 @@ Frontend + backend séparés; API REST (proposée) entre les deux; DB MongoDB. D
   - **Appel vidéo lancé par défaut** : dès la mise en relation, la demande d'appel et l'acceptation
     sont émises automatiquement (le rôle d'appelant reste exclusif) ; le bouton « Lancer le match »
     permet de relancer un appel arrêté.
-  - Signalement d'abus (`POST /api/reports`, `GET /api/reports/me`) : l'utilisateur signalé est
-    toujours l'autre participant, un signalement par session et par auteur (`409`), statut
-    `pending` uniquement.
-  - **Modération hors périmètre** : aucun outil de traitement ni sanction ; les signalements sont
-    seulement enregistrés.
 - Interface responsive et accessible mobile : CSS mobile-first, cibles tactiles ≥ 44 px, safe-area-inset,
   modale plein écran sur mobile.
 

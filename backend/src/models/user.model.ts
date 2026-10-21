@@ -54,7 +54,10 @@ export interface PublicUserDto {
  * Projection exposée publiquement : ni email, ni mot de passe, ni identifiant
  * technique anonyme, ni nom affiché (celui-ci voyage dans le jeton de session).
  */
-export const toPublicUser = (user: User, displayName?: string): PublicUserDto & { displayName?: string } => ({
+export const toPublicUser = (
+  user: User,
+  displayName?: string,
+): PublicUserDto & { displayName?: string } => ({
   id: String(user._id),
   ...(displayName ? { displayName } : {}),
   role: user.role,

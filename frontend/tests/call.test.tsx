@@ -15,7 +15,7 @@ interface EmittedEvent {
  * Le socket simule ici le client : une émission est seulement enregistrée.
  * Les messages du serveur sont simulés par `deliver`.
  */
-const { fakeSocket, getUserMediaMock, reportsCreateMock } = vi.hoisted(() => {
+const { fakeSocket, getUserMediaMock } = vi.hoisted(() => {
   class FakeSocket {
     connected = true;
     readonly emitted: EmittedEvent[] = [];
@@ -64,18 +64,7 @@ const { fakeSocket, getUserMediaMock, reportsCreateMock } = vi.hoisted(() => {
     getVideoTracks: () => [],
   }));
 
-  const reportsCreateMock = vi.fn(async () => ({
-    report: {
-      id: 'report-1',
-      matchId: 'match-1',
-      reason: 'harassment',
-      status: 'pending',
-      reportedDisplayName: 'Miora',
-      createdAt: '2026-01-01T00:00:00.000Z',
-    },
-  }));
-
-  return { fakeSocket: new FakeSocket(), getUserMediaMock, reportsCreateMock };
+  return { fakeSocket: new FakeSocket(), getUserMediaMock };
 });
 
 vi.mock('../src/lib/socket-client', () => ({
@@ -97,10 +86,6 @@ vi.mock('../src/lib/api-client', async (importOriginal) => {
           createdAt: '2026-01-01T00:00:00.000Z',
         },
       }),
-    },
-    reportsApi: {
-      ...actual.reportsApi,
-      create: reportsCreateMock,
     },
   };
 });
@@ -226,7 +211,6 @@ describe('Appel audiovisuel', () => {
     fakeSocket.emitted.length = 0;
     fakeSocket.connected = true;
     getUserMediaMock.mockClear();
-    reportsCreateMock.mockClear();
     FakePeerConnection.instances.length = 0;
     FakePeerConnection.autoTrackOnRemoteDescription = false;
     window.localStorage.setItem('i-keketa.session.token', 'jeton-de-test');
@@ -425,72 +409,5 @@ describe('Appel audiovisuel', () => {
 
     expect(screen.getByRole('region', { name: 'Match en cours' })).toBeInTheDocument();
     expect(screen.queryByText('Coup d’envoi…')).not.toBeInTheDocument();
-  });
-});
-
-describe('Signalement d’abus', () => {
-  beforeEach(() => {
-    fakeSocket.removeAllListeners();
-    fakeSocket.emitted.length = 0;
-    fakeSocket.connected = true;
-    reportsCreateMock.mockClear();
-    window.localStorage.setItem('i-keketa.session.token', 'jeton-de-test');
-  });
-
-  it('ouvre le formulaire de signalement', async () => {
-    const user = userEvent.setup();
-    await enterSession();
-
-    await user.click(await screen.findByRole('button', { name: '🚩 Signaler' }));
-
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByLabelText('Motif du signalement')).toBeInTheDocument();
-  });
-
-  it('envoie le signalement au serveur', async () => {
-    const user = userEvent.setup();
-    await enterSession();
-
-    await user.click(await screen.findByRole('button', { name: '🚩 Signaler' }));
-
-    await user.selectOptions(await screen.findByLabelText('Motif du signalement'), 'nudity');
-    await user.type(screen.getByLabelText('Description (facultatif)'), 'Contenu choquant.');
-    await user.click(screen.getByRole('button', { name: 'Envoyer le signalement' }));
-
-    await waitFor(() => {
-      expect(reportsCreateMock).toHaveBeenCalledWith('jeton-de-test', {
-        matchId: 'match-1',
-        reason: 'nudity',
-        details: 'Contenu choquant.',
-      });
-    });
-
-    expect(await screen.findByText(/Signalement envoyé/)).toBeInTheDocument();
-  });
-
-  it('affiche l’erreur renvoyée par le serveur', async () => {
-    reportsCreateMock.mockRejectedValueOnce(new Error('Trop de signalements envoyés.'));
-
-    const user = userEvent.setup();
-    await enterSession();
-
-    await user.click(await screen.findByRole('button', { name: '🚩 Signaler' }));
-    await user.click(screen.getByRole('button', { name: 'Envoyer le signalement' }));
-
-    expect(await screen.findByText('Trop de signalements envoyés.')).toBeInTheDocument();
-  });
-
-  it('permet d’annuler le signalement', async () => {
-    const user = userEvent.setup();
-    await enterSession();
-
-    await user.click(await screen.findByRole('button', { name: '🚩 Signaler' }));
-    await user.click(await screen.findByRole('button', { name: 'Annuler' }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
-
-    expect(reportsCreateMock).not.toHaveBeenCalled();
   });
 });

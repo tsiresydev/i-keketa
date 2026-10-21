@@ -9,7 +9,6 @@ import { env } from '../config/env';
 export const rateLimits = {
   globalMax: env.RATE_LIMIT_MAX,
   authMax: env.AUTH_RATE_LIMIT_MAX,
-  reportMax: env.REPORT_RATE_LIMIT_MAX,
 };
 
 const buildLimiter = (resolveMax: () => number, message: string): RateLimitRequestHandler =>
@@ -37,20 +36,3 @@ export const authLimiter = buildLimiter(
   () => rateLimits.authMax,
   'Trop de tentatives, veuillez réessayer plus tard.',
 );
-
-/**
- * Limite dédiée aux signalements d'abus (anti-spam).
- * Fenêtre propre à la fonctionnalité (`REPORT_RATE_LIMIT_WINDOW_MS`).
- */
-export const reportLimiter = rateLimit({
-  windowMs: env.REPORT_RATE_LIMIT_WINDOW_MS,
-  limit: () => rateLimits.reportMax,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  message: {
-    error: {
-      code: 'TOO_MANY_REQUESTS',
-      message: 'Trop de signalements envoyés. Réessayez plus tard.',
-    },
-  },
-});

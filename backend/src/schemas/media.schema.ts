@@ -1,10 +1,8 @@
 import { z } from 'zod';
-import { env } from '../config/env';
-import { REPORT_REASONS } from '../models/report.model';
 
 /**
  * Schémas de validation du Sprint 3 : signalisation temps réel des appels
- * audiovisuels et signalement d'abus.
+ * audiovisuels.
  */
 
 /** Taille maximale d'une description SDP transmise au serveur. */
@@ -56,25 +54,7 @@ export const mediaEndSchema = z
   })
   .strict();
 
-export const reportCreateSchema = z
-  .object({
-    matchId: z.string().trim().min(1, 'Identifiant de session manquant.').max(64),
-    reason: z.enum(REPORT_REASONS, {
-      errorMap: () => ({ message: 'Motif de signalement invalide.' }),
-    }),
-    details: z
-      .string()
-      .trim()
-      .max(
-        env.REPORT_DETAILS_MAX_LENGTH,
-        `Le descriptif ne peut pas dépasser ${env.REPORT_DETAILS_MAX_LENGTH} caractères.`,
-      )
-      .optional(),
-  })
-  .strict();
-
 export type MediaRequestInput = z.infer<typeof mediaRequestSchema>;
 export type MediaOfferInput = z.infer<typeof mediaOfferSchema>;
 export type MediaCandidateInput = z.infer<typeof mediaCandidateSchema>;
 export type MediaStateInput = z.infer<typeof mediaStateSchema>;
-export type ReportCreateInput = z.infer<typeof reportCreateSchema>;
