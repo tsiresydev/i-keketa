@@ -14,6 +14,7 @@ module.exports = tseslint.config(
       '**/docs/**',
       'backend/dist/**',
       'frontend/dist/**',
+      'frontend/public/**',
     ],
   },
   js.configs.recommended,
