@@ -142,6 +142,25 @@ La cible doit être connectée et libre, sinon l'erreur `USER_UNAVAILABLE` est r
 
 Le détail des contrats se trouve dans `docs/architecture/api.md`.
 
+## Déploiement (plan gratuit)
+
+| Composant | Hébergeur | Plan  | URL                               |
+| --------- | --------- | ----- | --------------------------------- |
+| Frontend  | Vercel    | Hobby | https://i-keketa.vercel.app       |
+| Backend   | Render    | Free  | https://i-keketa-api.onrender.com |
+
+Les deux services se construisent automatiquement depuis `main`
+(`https://github.com/tsiresydev/i-keketa`) :
+
+- `render.yaml` (racine) décrit le service **Render** (build, démarrage, health check `/health`,
+  variables d'environnement) ;
+- `frontend/vercel.json` décrit le routage SPA du **frontend Vercel** (`/chat`, `/profil`,
+  `/decouvrir` sont servies par `index.html`) ;
+- la variable `VITE_API_URL` du frontend pointe vers le backend Render.
+
+Le détail des variables, des limitations du plan gratuit et des commandes de redéploiement se trouve
+dans `docs/deployment/deployment.md`.
+
 ## Commandes utiles
 
 | Commande                                           | Description                                                    |

@@ -34,3 +34,9 @@ Thumbs.db
 
 # Photos de profil (stockage local runtime)
 backend/uploads/
+
+# Déploiement
+.vercel/
+.render/
+
+.vercel

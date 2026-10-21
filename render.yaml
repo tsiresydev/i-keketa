@@ -1,0 +1,65 @@
+# Blueprint Render — API + temps réel (plan gratuit)
+#
+# Déploiement : https://dashboard.render.com → New → Blueprint → sélectionner ce dépôt.
+# Les variables marquées `sync: false` doivent être renseignées dans le tableau de bord
+# (elles ne peuvent pas être versionnées : elles contiennent un secret ou dépendent
+# du domaine du frontend).
+#
+# Documentation : docs/deployment/deployment.md
+
+services:
+  - type: web
+    name: i-keketa-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: .
+    # Monorepo npm workspaces : l'installation se fait à la racine (package-lock.json),
+    # le build du backend dans le workspace `backend`.
+    buildCommand: npm ci && npm run build --workspace backend
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.0
+      # URI MongoDB Atlas (M0 gratuit) — à renseigner dans le tableau de bord.
+      - key: MONGODB_URI
+        sync: false
+      # Secret de signature des jetons : généré automatiquement par Render.
+      - key: JWT_SECRET
+        generateValue: true
+      # Origines autorisées (domaine Vercel du frontend), séparées par des virgules.
+      - key: CORS_ORIGIN
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: BCRYPT_SALT_ROUNDS
+        value: 10
+      - key: USE_IN_MEMORY_DB
+        value: false
+      # Stockage local des photos de profil (système de fichiers éphémère sur le plan gratuit).
+      - key: PHOTO_STORAGE_DIR
+        value: uploads/photos
+      - key: PHOTO_MAX_SIZE_BYTES
+        value: 2097152
+      - key: RATE_LIMIT_MAX
+        value: 300
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: AUTH_RATE_LIMIT_MAX
+        value: 10
+      - key: WS_MESSAGE_RATE_MAX
+        value: 20
+      - key: WS_MESSAGE_RATE_WINDOW_MS
+        value: 10000
+      - key: MESSAGE_MAX_LENGTH
+        value: 2000
+      - key: REPORT_DETAILS_MAX_LENGTH
+        value: 1000
+      - key: REPORT_RATE_LIMIT_MAX
+        value: 5
+      - key: REPORT_RATE_LIMIT_WINDOW_MS
+        value: 3600000
