@@ -114,6 +114,14 @@ const deliver = async (event: string, payload?: unknown): Promise<void> => {
   });
 };
 
+/**
+ * Laisse les promesses en attente et les rendus React se terminer.
+ */
+const flushPendingTasks = async (): Promise<void> => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+};
+
 const renderChatPage = async () => {
   const view = render(
     <MemoryRouter initialEntries={['/chat']}>
@@ -149,6 +157,11 @@ const enterSession = async (): Promise<void> => {
  */
 class FakePeerConnection {
   static instances: FakePeerConnection[] = [];
+  /**
+   * Simule le navigateur qui distribue l'événement `track` pendant
+   * l'application de la description distante.
+   */
+  static autoTrackOnRemoteDescription = false;
 
   onicecandidate: ((event: { candidate: unknown }) => void) | null = null;
   ontrack: ((event: unknown) => void) | null = null;
@@ -178,6 +191,11 @@ class FakePeerConnection {
 
   setRemoteDescription(description: unknown): Promise<void> {
     this.remoteDescription = description;
+
+    if (FakePeerConnection.autoTrackOnRemoteDescription) {
+      this.emitRemoteTrack();
+    }
+
     return Promise.resolve();
   }
 
@@ -186,6 +204,20 @@ class FakePeerConnection {
   }
 
   close(): void {}
+
+  /** Simule l'arrivée du flux distant (événement `track`). */
+  emitRemoteTrack(): void {
+    this.ontrack?.({
+      streams: [{ id: 'flux-distant' }],
+      track: { id: 'piste-distante' },
+    });
+  }
+
+  /** Simule l'établissement de la connexion pair-à-pair. */
+  emitConnected(): void {
+    this.connectionState = 'connected';
+    this.onconnectionstatechange?.();
+  }
 }
 
 describe('Appel audiovisuel', () => {
@@ -196,6 +228,7 @@ describe('Appel audiovisuel', () => {
     getUserMediaMock.mockClear();
     reportsCreateMock.mockClear();
     FakePeerConnection.instances.length = 0;
+    FakePeerConnection.autoTrackOnRemoteDescription = false;
     window.localStorage.setItem('i-keketa.auth.token', 'jeton-de-test');
 
     Object.defineProperty(navigator, 'mediaDevices', {
@@ -316,6 +349,66 @@ describe('Appel audiovisuel', () => {
     await deliver('media:ended', { matchId: 'match-1', reason: 'hangup' });
 
     expect(await screen.findByText('Votre partenaire a raccroché.')).toBeInTheDocument();
+  });
+
+  it('bascule en « en cours » quand la connexion pair-à-pair s’établit', async () => {
+    const user = userEvent.setup();
+    await enterSession();
+
+    await user.click(await screen.findByRole('button', { name: '📹 Appeler' }));
+    await waitFor(() => {
+      expect(fakeSocket.emitted.some((entry) => entry.event === 'media:request')).toBe(true);
+    });
+
+    await deliver('media:accepted', { matchId: 'match-1' });
+
+    await waitFor(() => {
+      expect(fakeSocket.emitted.some((entry) => entry.event === 'media:offer')).toBe(true);
+    });
+
+    expect(await screen.findByText('Connexion à l’appel…')).toBeInTheDocument();
+
+    const peer = FakePeerConnection.instances[0];
+
+    expect(peer).toBeDefined();
+
+    await act(async () => {
+      peer?.emitConnected();
+      await flushPendingTasks();
+    });
+
+    expect(screen.getByRole('region', { name: 'Appel en cours' })).toBeInTheDocument();
+    expect(screen.queryByText('Connexion à l’appel…')).not.toBeInTheDocument();
+  });
+
+  it('ne rebascule pas en « connexion » après l’arrivée du flux distant', async () => {
+    // Le navigateur distribue `track` pendant l'application de la description
+    // distante : le statut « en cours » ne doit pas être écrasé ensuite.
+    FakePeerConnection.autoTrackOnRemoteDescription = true;
+
+    const user = userEvent.setup();
+    await enterSession();
+
+    await deliver('media:request', { matchId: 'match-1', audio: true, video: true });
+    await user.click(await screen.findByRole('button', { name: 'Accepter' }));
+
+    await waitFor(() => {
+      expect(fakeSocket.emitted.some((entry) => entry.event === 'media:accept')).toBe(true);
+    });
+
+    await deliver('media:offer', {
+      matchId: 'match-1',
+      description: JSON.stringify({ type: 'offer', sdp: 'v=0' }),
+    });
+
+    // Toute la négociation (réponse émise, rendus appliqués) doit être
+    // terminée avant de contrôler l'état final affiché.
+    await act(async () => {
+      await flushPendingTasks();
+    });
+
+    expect(screen.getByRole('region', { name: 'Appel en cours' })).toBeInTheDocument();
+    expect(screen.queryByText('Connexion à l’appel…')).not.toBeInTheDocument();
   });
 });
 

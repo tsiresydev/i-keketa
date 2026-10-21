@@ -8,6 +8,12 @@ import type { MediaCallStatus, MediaCallStatePayload } from '../types';
  */
 const DEFAULT_STUN_URL = 'stun:stun.l.google.com:19302';
 
+/**
+ * Délai maximal pour établir la connexion pair-à-pair avant de proposer
+ * à l'utilisateur de réessayer.
+ */
+const CONNECTION_TIMEOUT_MS = 30_000;
+
 const stunServers = (): RTCIceServer[] => {
   const configured = (import.meta.env.VITE_STUN_URLS as string | undefined) ?? DEFAULT_STUN_URL;
 
@@ -98,11 +104,13 @@ export const useMediaCall = (
   const matchIdRef = useRef<string | null>(matchId);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  /** Vrai si l'utilisateur est à l'origine de l'appel en cours (émetteur de l'offre). */
+  /** Vrai tant que l'utilisateur doit encore émettre l'offre (il est l'appelant). */
   const isCallerRef = useRef(false);
   /** Candidats ICE reçus avant la description distante (mise en ordre). */
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const remoteDescriptionSetRef = useRef(false);
+  /** Minuteur de connexion (annulé dès que l'appel est établi). */
+  const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     socketRef.current = socket;
@@ -132,8 +140,19 @@ export const useMediaCall = (
     localStream?.getTracks().forEach((track) => track.stop());
   }, []);
 
+  /**
+   * Annule le minuteur de connexion.
+   */
+  const clearConnectionTimeout = useCallback((): void => {
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
+  }, []);
+
   const resetCall = useCallback(
     (nextState: Partial<MediaCallState> = {}) => {
+      clearConnectionTimeout();
       closePeer();
       pendingCandidatesRef.current = [];
       remoteDescriptionSetRef.current = false;
@@ -144,8 +163,24 @@ export const useMediaCall = (
         ...nextState,
       });
     },
-    [closePeer],
+    [clearConnectionTimeout, closePeer],
   );
+
+  /**
+   * Arme le minuteur de connexion : sans lui, l'appel resterait bloqué sur
+   * « Connexion à l'appel… » si la négociation ICE n'aboutit pas.
+   */
+  const armConnectionTimeout = useCallback((): void => {
+    clearConnectionTimeout();
+
+    connectionTimeoutRef.current = setTimeout(() => {
+      connectionTimeoutRef.current = null;
+
+      resetCall({
+        error: 'La connexion à l’appel n’a pas abouti. Vérifiez votre réseau puis réessayez.',
+      });
+    }, CONNECTION_TIMEOUT_MS);
+  }, [clearConnectionTimeout, resetCall]);
 
   /**
    * Acquiert les médias locaux (micro et caméra).
@@ -186,7 +221,14 @@ export const useMediaCall = (
       };
 
       peer.ontrack = (event) => {
+        // Un événement tardif d'une connexion déjà close est ignoré.
+        if (peerRef.current !== peer) {
+          return;
+        }
+
         const [stream] = event.streams;
+
+        clearConnectionTimeout();
 
         setState((previous) => ({
           ...previous,
@@ -196,19 +238,26 @@ export const useMediaCall = (
       };
 
       peer.onconnectionstatechange = () => {
+        if (peerRef.current !== peer) {
+          return;
+        }
+
+        if (peer.connectionState === 'connected') {
+          clearConnectionTimeout();
+
+          setState((previous) => ({ ...previous, status: 'in-call' }));
+          return;
+        }
+
         if (peer.connectionState === 'failed') {
-          setState((previous) => ({
-            ...previous,
-            error: 'La connexion à l’appel a échoué.',
-          }));
-          resetCall();
+          resetCall({ error: 'La connexion à l’appel a échoué.' });
         }
       };
 
       peerRef.current = peer;
       return peer;
     },
-    [resetCall],
+    [clearConnectionTimeout, resetCall],
   );
 
   /**
@@ -282,6 +331,10 @@ export const useMediaCall = (
       if (!isCallerRef.current) {
         return;
       }
+
+      // L'offre ne part qu'une fois : un événement répété est ignoré.
+      isCallerRef.current = false;
+
       // Le demandeur devient l'émetteur de l'offre WebRTC.
       void (async () => {
         try {
@@ -290,6 +343,11 @@ export const useMediaCall = (
           if (!localStream) {
             return;
           }
+
+          // Le statut passe en « connexion » AVANT la négociation : l'événement
+          // `track`, qui bascule en « en cours », est distribué par le
+          // navigateur et ne doit pas pouvoir être écrasé ensuite.
+          setState((previous) => ({ ...previous, status: 'connecting', error: null }));
 
           const peer = peerRef.current ?? createPeer(localStream);
 
@@ -301,8 +359,7 @@ export const useMediaCall = (
             description: JSON.stringify(peer.localDescription),
           });
 
-          setState((previous) => ({ ...previous, status: 'connecting', error: null }));
-          isCallerRef.current = false;
+          armConnectionTimeout();
         } catch {
           setState((previous) => ({
             ...previous,
@@ -325,6 +382,11 @@ export const useMediaCall = (
             return;
           }
 
+          // Statut « connexion » posé AVANT l'application de la description
+          // distante : l'événement `track` (bascule en « en cours ») est
+          // distribué par le navigateur et ne doit pas être écrasé ensuite.
+          setState((previous) => ({ ...previous, status: 'connecting' }));
+
           const peer = peerRef.current ?? createPeer(localStream);
 
           await peer.setRemoteDescription(
@@ -341,7 +403,7 @@ export const useMediaCall = (
             description: JSON.stringify(peer.localDescription),
           });
 
-          setState((previous) => ({ ...previous, status: 'connecting' }));
+          armConnectionTimeout();
         } catch {
           setState((previous) => ({
             ...previous,
@@ -364,13 +426,18 @@ export const useMediaCall = (
             return;
           }
 
+          // Statut « connexion » posé AVANT l'application de la description
+          // distante : l'événement `track` (bascule en « en cours ») est
+          // distribué par le navigateur et ne doit pas être écrasé ensuite.
+          setState((previous) => ({ ...previous, status: 'connecting' }));
+
           await peer.setRemoteDescription(
             JSON.parse(payload.description) as RTCSessionDescriptionInit,
           );
           remoteDescriptionSetRef.current = true;
           await flushCandidates();
 
-          setState((previous) => ({ ...previous, status: 'connecting' }));
+          armConnectionTimeout();
         } catch {
           setState((previous) => ({
             ...previous,
@@ -431,7 +498,7 @@ export const useMediaCall = (
       socket.off('media:state', handleState);
       socket.off('media:ended', handleEnded);
     };
-  }, [socket, addCandidate, createPeer, flushCandidates, resetCall]);
+  }, [socket, addCandidate, armConnectionTimeout, createPeer, flushCandidates, resetCall]);
 
   /* ---------- Changement de session : l'appel estclos ---------- */
 
@@ -514,6 +581,10 @@ export const useMediaCall = (
       }));
 
       socketRef.current.emit('media:accept', { matchId: currentMatchId });
+
+      // Si l'appelant n'envoie jamais d'offre, l'appel ne doit pas rester
+      // bloqué indéfiniment sur « Connexion à l'appel… ».
+      armConnectionTimeout();
     } catch (error) {
       resetCall({
         error:
@@ -522,7 +593,7 @@ export const useMediaCall = (
             : describeMediaError(error),
       });
     }
-  }, [acquireLocalMedia, createPeer, resetCall]);
+  }, [acquireLocalMedia, armConnectionTimeout, createPeer, resetCall]);
 
   const declineCall = useCallback((): void => {
     const currentMatchId = matchIdRef.current;

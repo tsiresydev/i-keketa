@@ -18,3 +18,6 @@ if (typeof URL.createObjectURL !== 'function') {
 if (typeof URL.revokeObjectURL !== 'function') {
   URL.revokeObjectURL = vi.fn();
 }
+
+// jsdom n'implémente pas la lecture des flux médias.
+window.HTMLMediaElement.prototype.play = vi.fn(() => Promise.resolve());
