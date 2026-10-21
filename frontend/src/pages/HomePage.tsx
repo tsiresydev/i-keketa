@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Alert } from '../components/Alert';
 import { FormField } from '../components/FormField';
@@ -13,6 +13,38 @@ import { validateSessionDisplayName } from '../lib/validation';
 export const HomePage = () => {
   const { status, createSession } = useSession();
   const navigate = useNavigate();
+
+  // Demande l'accès à la caméra et au micro dès l'ouverture de la page,
+  // afin que la permission soit déjà accordée lors du lancement de l'appel.
+  useEffect(() => {
+    let cancelled = false;
+
+    const requestMedia = async (): Promise<void> => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        stream.getTracks().forEach((track) => track.stop());
+      } catch {
+        // Permission refusée ou matériel indisponible : on laisse l'utilisateur
+        // continuer, l'appel demandera à nouveau l'accès le moment venu.
+      }
+    };
+
+    void requestMedia();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [displayName, setDisplayName] = useState('');
   const [fieldError, setFieldError] = useState<string | undefined>(undefined);
@@ -52,7 +84,8 @@ export const HomePage = () => {
         <p className="home-page__text">
           I-Keketa met en relation des inconnus de manière aléatoire pour discuter en vidéo, à
           Madagascar. Entrez un nom affiché, soyez mis en relation avec un autre utilisateur et
-          échangez en visio. Aucun compte, aucun mot de passe.
+          échangez en visio. Aucun compte, aucun mot de passe. L'accès à la caméra et au micro vous
+          sera demandé à l'ouverture.
         </p>
       </section>
 
