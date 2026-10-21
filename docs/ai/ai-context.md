@@ -69,6 +69,9 @@ Frontend + backend séparés; API REST (proposée) entre les deux; DB MongoDB. D
 - Sprint 3 (messagerie audiovisuelle, signalement) : **implémenté et testé**.
   - Signalisation WebRTC pair-à-pair relayée par Socket.IO (événements `media:*`), sessions d'appel
     (`CallSession`) et interface d'appel (`VideoCallPanel`).
+  - **Appel vidéo lancé par défaut** : dès la mise en relation, la demande d'appel et l'acceptation
+    sont émises automatiquement (le rôle d'appelant reste exclusif) ; le bouton « Appeler » permet
+    de relancer un appel arrêté.
   - Signalement d'abus (`POST /api/reports`, `GET /api/reports/me`) : l'utilisateur signalé est
     toujours l'autre participant, un signalement par session et par auteur (`409`), statut
     `pending` uniquement.

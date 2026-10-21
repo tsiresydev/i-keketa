@@ -41,6 +41,19 @@ const waitFor = (socket, event, timeoutMs = 10000) =>
     });
   });
 
+/**
+ * Renvoie le premier événement reçu parmi la liste (utile quand plusieurs
+ * issues sont possibles : demande d'appel acceptée, relayed ou rejetée).
+ */
+const collect = (socket, event, timeoutMs = 10000) =>
+  new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), timeoutMs);
+    socket.once(event, (payload) => {
+      clearTimeout(timer);
+      resolve(payload);
+    });
+  });
+
 const connect = (token) =>
   new Promise((resolve, reject) => {
     const socket = io(baseUrl, { auth: { token }, transports: ['websocket'], reconnection: false });
@@ -343,17 +356,43 @@ const main = async () => {
 
   /* ---------- Sprint 3 : signalisation audiovisuelle et signalements ---------- */
 
-  const callRequest = waitFor(tianaSocket, 'media:request');
+  // L'appel vidéo est proposé automatiquement par les deux participants dès la
+  // mise en relation : les deux demandes partent en même temps. Le serveur
+  // n'accepte qu'une seule session d'appel et l'autre demande est rejetée.
+  const aliceRequestPromise = collect(alice, 'media:request');
+  const tianaRequestPromise = collect(tianaSocket, 'media:request');
+  const aliceConflictPromise = collect(alice, 'chat:error');
+  const tianaConflictPromise = collect(tianaSocket, 'chat:error');
+
   alice.emit('media:request', { matchId: directEvent.matchId, audio: true, video: true });
-  const callRequestPayload = await callRequest;
-  check(
-    'Demande d’appel reliée au partenaire',
-    callRequestPayload.matchId === directEvent.matchId && callRequestPayload.audio === true,
-    `match ${callRequestPayload.matchId}`,
+  tianaSocket.emit('media:request', { matchId: directEvent.matchId, audio: true, video: true });
+
+  const [aliceRequest, tianaRequest, aliceConflict, tianaConflict] = await Promise.all([
+    aliceRequestPromise,
+    tianaRequestPromise,
+    aliceConflictPromise,
+    tianaConflictPromise,
+  ]);
+
+  // Une seule demande est relayée au partenaire, l'autre est rejetée.
+  const relayed = [aliceRequest, tianaRequest].filter(Boolean);
+  const rejected = [aliceConflict, tianaConflict].filter(
+    (payload) => payload?.code === 'CALL_ALREADY_ACTIVE',
   );
 
-  const callAccepted = waitFor(alice, 'media:accepted');
-  tianaSocket.emit('media:accept', { matchId: directEvent.matchId });
+  check(
+    'Un seul appel est créé pour deux demandes simultanées',
+    relayed.length === 1 && rejected.length === 1,
+    `${relayed.length} relayée(s), ${rejected.length} rejet(s)`,
+  );
+
+  // Le serveur ne relaie la demande qu'à l'appelé : l'autre participant est
+  // l'appelant.
+  const callee = aliceRequest ? alice : tianaSocket;
+  const caller = aliceRequest ? tianaSocket : alice;
+
+  const callAccepted = waitFor(caller, 'media:accepted');
+  callee.emit('media:accept', { matchId: directEvent.matchId });
   const acceptedPayload = await callAccepted;
   check(
     'Acceptation d’appel reliée à l’appelant',
@@ -361,8 +400,8 @@ const main = async () => {
     `match ${acceptedPayload.matchId}`,
   );
 
-  const offerReceived = waitFor(tianaSocket, 'media:offer');
-  alice.emit('media:offer', {
+  const offerReceived = waitFor(callee, 'media:offer');
+  caller.emit('media:offer', {
     matchId: directEvent.matchId,
     description: JSON.stringify({ type: 'offer', sdp: 'v=0' }),
   });
@@ -373,8 +412,8 @@ const main = async () => {
     offerPayload.description.slice(0, 24),
   );
 
-  const answerReceived = waitFor(alice, 'media:answer');
-  tianaSocket.emit('media:answer', {
+  const answerReceived = waitFor(caller, 'media:answer');
+  callee.emit('media:answer', {
     matchId: directEvent.matchId,
     description: JSON.stringify({ type: 'answer', sdp: 'v=0' }),
   });
@@ -385,8 +424,8 @@ const main = async () => {
     answerPayload.description.slice(0, 24),
   );
 
-  const candidateReceived = waitFor(tianaSocket, 'media:candidate');
-  alice.emit('media:candidate', {
+  const candidateReceived = waitFor(callee, 'media:candidate');
+  caller.emit('media:candidate', {
     matchId: directEvent.matchId,
     candidate: JSON.stringify({ candidate: 'candidate:1 1 udp', sdpMid: '0' }),
   });
@@ -397,8 +436,8 @@ const main = async () => {
     candidatePayload.candidate.slice(0, 24),
   );
 
-  const stateReceived = waitFor(tianaSocket, 'media:state');
-  alice.emit('media:state', { matchId: directEvent.matchId, audio: false, video: true });
+  const stateReceived = waitFor(callee, 'media:state');
+  caller.emit('media:state', { matchId: directEvent.matchId, audio: false, video: true });
   const statePayload = await stateReceived;
   check(
     'État micro/caméra relié au partenaire',
@@ -406,8 +445,8 @@ const main = async () => {
     `audio ${statePayload.audio}, video ${statePayload.video}`,
   );
 
-  const callEnded = waitFor(tianaSocket, 'media:ended');
-  alice.emit('media:end', { matchId: directEvent.matchId });
+  const callEnded = waitFor(callee, 'media:ended');
+  caller.emit('media:end', { matchId: directEvent.matchId });
   const endedPayload = await callEnded;
   check(
     'Fin d’appel reliée au partenaire',

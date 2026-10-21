@@ -42,6 +42,15 @@ const END_REASON_MESSAGES: Record<MatchEndedPayload['reason'], string> = {
   user_disconnected: 'La discussion est terminée.',
 };
 
+/**
+ * Erreurs ignorées.
+ *
+ * L'appel vidéo est proposé automatiquement par les deux participants : la
+ * demande concurrente rejetée par le serveur est donc normale et ne doit pas
+ * être signalée à l'utilisateur.
+ */
+const IGNORED_CHAT_ERROR_CODES = new Set(['CALL_ALREADY_ACTIVE']);
+
 const initialState: ChatSocketState = {
   connectionStatus: 'connecting',
   chatStatus: 'idle',
@@ -160,6 +169,10 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
     });
 
     socket.on('chat:error', (payload: ChatErrorPayload) => {
+      if (IGNORED_CHAT_ERROR_CODES.has(payload.code)) {
+        return;
+      }
+
       setState((previous) => ({ ...previous, error: payload.message }));
     });
 

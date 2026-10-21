@@ -24,6 +24,30 @@ const waitForEvent = <T>(socket: ClientSocket, event: string, timeoutMs = 10_000
     socket.on(event, handler);
   });
 
+/**
+ * Attend un événement sans échouer s'il n'arrive pas : plusieurs issues
+ * sont possibles (événement reçu ou absence d'événement).
+ */
+const collectEvent = <T>(
+  socket: ClientSocket,
+  event: string,
+  timeoutMs = 10_000,
+): Promise<T | null> =>
+  new Promise<T | null>((resolve) => {
+    const timer = setTimeout(() => {
+      socket.off(event, handler);
+      resolve(null);
+    }, timeoutMs);
+
+    const handler = (payload: T) => {
+      clearTimeout(timer);
+      socket.off(event, handler);
+      resolve(payload);
+    };
+
+    socket.on(event, handler);
+  });
+
 const connectClient = (url: string, token: string): Promise<ClientSocket> =>
   new Promise((resolve, reject) => {
     const socket = ioClient(url, {
@@ -128,6 +152,34 @@ describe('Temps réel — signalisation des appels audiovisuels', () => {
     aliceSocket.emit('media:request', { matchId, audio: true, video: true });
 
     expect((await error).code).toBe('CALL_ALREADY_ACTIVE');
+  });
+
+  it('ne crée qu’un seul appel lorsque les deux participants demandent en même temps', async () => {
+    const { aliceSocket, bobSocket, matchId } = await matchPair();
+
+    const aliceRequest = collectEvent<{ matchId: string }>(aliceSocket, 'media:request');
+    const bobRequest = collectEvent<{ matchId: string }>(bobSocket, 'media:request');
+    const aliceError = collectEvent<{ code: string }>(aliceSocket, 'chat:error');
+    const bobError = collectEvent<{ code: string }>(bobSocket, 'chat:error');
+
+    aliceSocket.emit('media:request', { matchId, audio: true, video: true });
+    bobSocket.emit('media:request', { matchId, audio: true, video: true });
+
+    const [aliceRequestPayload, bobRequestPayload, aliceErrorPayload, bobErrorPayload] =
+      await Promise.all([aliceRequest, bobRequest, aliceError, bobError]);
+
+    // Une seule demande est relayée, l'autre est rejetée.
+    const relayed = [aliceRequestPayload, bobRequestPayload].filter((payload) => payload !== null);
+    const rejected = [aliceErrorPayload, bobErrorPayload].filter(
+      (payload) => payload?.code === 'CALL_ALREADY_ACTIVE',
+    );
+
+    expect(relayed).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    // Une seule session d'appel est créée en base.
+    const sessions = await CallSessionModel.find({ matchId });
+    expect(sessions).toHaveLength(1);
   });
 
   it('refuse un appel sans session de chat active', async () => {

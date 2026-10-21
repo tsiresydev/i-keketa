@@ -24,9 +24,32 @@ export const VideoStream = ({ stream, muted = false, className, label }: VideoSt
 
     element.srcObject = stream;
 
-    if (stream) {
-      void element.play().catch(() => undefined);
+    if (!stream) {
+      return;
     }
+
+    const play = (): void => {
+      void element.play().catch(() => undefined);
+    };
+
+    play();
+
+    // Certains navigateurs bloquent la lecture automatique d'une vidéo avec
+    // le son : la lecture est relancée à la première interaction de
+    // l'utilisateur (l'appel vidéo démarré automatiquement reste visible).
+    const retry = (): void => {
+      play();
+      document.removeEventListener('pointerdown', retry);
+      document.removeEventListener('keydown', retry);
+    };
+
+    document.addEventListener('pointerdown', retry);
+    document.addEventListener('keydown', retry);
+
+    return () => {
+      document.removeEventListener('pointerdown', retry);
+      document.removeEventListener('keydown', retry);
+    };
   }, [stream]);
 
   return (

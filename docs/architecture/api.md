@@ -264,6 +264,17 @@ Déroulé d'un appel :
 5. `media:end` (ou la fin de la session de chat) clôture l'appel : le serveur marque la session
    d'appel `ended` et relaie `media:ended`.
 
+Lancement automatique :
+
+- Dès la mise en relation (`match:found`), le client frontend demande l'accès à la caméra et au
+  micro puis émet `media:request` sans action de l'utilisateur ; le bouton « Appeler » reste
+  disponible pour relancer un appel arrêté.
+- L'appel entrant est accepté automatiquement (`media:accept`) : la demande concurrente émise par
+  le partenaire est alors rejetée par le serveur (`CALL_ALREADY_ACTIVE`) et cette erreur est
+  ignorée côté client.
+- Le rôle d'appelant est exclusif : seul celui dont la demande a été acceptée par le serveur
+  émet l'offre SDP.
+
 Règles :
 
 - Tous les événements `media:*` exigent une session de chat active avec le `matchId` fourni
@@ -272,6 +283,8 @@ Règles :
 - Un appel ne peut être accepté que s'il existe une session d'appel en attente (`CALL_NOT_FOUND`).
 - Une demande d'appel restée sans réponse est close après 60 secondes (`CALL_REQUEST_TIMEOUT_MS`) :
   les deux participants reçoivent `media:ended` avec le motif `media_failed`.
+- Côté client, la négociation doit aboutir dans les 30 secondes, sinon l'appel est clos et un
+  message d'erreur invite à réessayer.
 - L'appel est clôturé automatiquement à la fin de la session de chat, à la déconnexion d'un
   participant ou au changement de partenaire.
 - Serveurs ICE : `VITE_STUN_URLS` côté frontend (liste séparée par des virgules), par défaut

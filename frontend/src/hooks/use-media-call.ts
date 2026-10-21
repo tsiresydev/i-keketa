@@ -37,8 +37,14 @@ export interface MediaCallState {
 }
 
 export interface MediaCallActions {
-  startCall: () => Promise<void>;
-  acceptCall: () => Promise<void>;
+  /**
+   * Demande un appel au partenaire.
+   *
+   * `automatic` signale un appel lancé sans action de l'utilisateur (mise en
+   * relation automatique) : un message accompagne alors la demande.
+   */
+  startCall: (options?: { automatic?: boolean }) => Promise<void>;
+  acceptCall: (options?: { automatic?: boolean }) => Promise<void>;
   declineCall: () => void;
   endCall: () => void;
   toggleMicrophone: () => void;
@@ -106,6 +112,8 @@ export const useMediaCall = (
   const localStreamRef = useRef<MediaStream | null>(null);
   /** Vrai tant que l'utilisateur doit encore émettre l'offre (il est l'appelant). */
   const isCallerRef = useRef(false);
+  /** Vrai tant qu'un appel entrant n'a pas été traité (l'utilisateur est l'appelé). */
+  const incomingCallRef = useRef(false);
   /** Candidats ICE reçus avant la description distante (mise en ordre). */
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const remoteDescriptionSetRef = useRef(false);
@@ -157,6 +165,7 @@ export const useMediaCall = (
       pendingCandidatesRef.current = [];
       remoteDescriptionSetRef.current = false;
       isCallerRef.current = false;
+      incomingCallRef.current = false;
 
       setState({
         ...initialState,
@@ -175,6 +184,14 @@ export const useMediaCall = (
 
     connectionTimeoutRef.current = setTimeout(() => {
       connectionTimeoutRef.current = null;
+
+      // L'appel est clos côté serveur pour ne pas laisser une session d'appel
+      // en attente chez le partenaire.
+      const currentMatchId = matchIdRef.current;
+
+      if (currentMatchId) {
+        socketRef.current?.emit('media:end', { matchId: currentMatchId });
+      }
 
       resetCall({
         error: 'La connexion à l’appel n’a pas abouti. Vérifiez votre réseau puis réessayez.',
@@ -312,6 +329,11 @@ export const useMediaCall = (
       if (payload.matchId !== matchIdRef.current) {
         return;
       }
+
+      // Le serveur ne relaie la demande qu'au futur appelé : l'utilisateur
+      // ne peut donc plus être l'appelant de cet appel.
+      isCallerRef.current = false;
+      incomingCallRef.current = true;
 
       setState((previous) => ({
         ...previous,
@@ -522,78 +544,119 @@ export const useMediaCall = (
 
   /* ---------- Actions utilisateur ---------- */
 
-  const startCall = useCallback(async (): Promise<void> => {
-    const currentMatchId = matchIdRef.current;
+  const startCall = useCallback(
+    async (options: { automatic?: boolean } = {}): Promise<void> => {
+      const currentMatchId = matchIdRef.current;
 
-    if (!currentMatchId || !socketRef.current) {
-      return;
-    }
+      if (!currentMatchId || !socketRef.current) {
+        return;
+      }
 
-    setState((previous) => ({ ...previous, status: 'requesting', error: null, notice: null }));
-    isCallerRef.current = true;
-
-    try {
-      const localStream = await acquireLocalMedia();
-      localStreamRef.current = localStream;
-
-      setState((previous) => ({
-        ...previous,
-        localStream,
-        isMicrophoneEnabled: true,
-        isCameraEnabled: true,
-      }));
-
-      socketRef.current.emit('media:request', {
-        matchId: currentMatchId,
-        audio: true,
-        video: true,
-      });
-    } catch (error) {
-      resetCall({
-        error:
-          error instanceof Error && error.message === 'MEDIA_UNSUPPORTED'
-            ? 'Votre navigateur ne permet pas d’accéder à la caméra ou au micro.'
-            : describeMediaError(error),
-      });
-    }
-  }, [acquireLocalMedia, resetCall]);
-
-  const acceptCall = useCallback(async (): Promise<void> => {
-    const currentMatchId = matchIdRef.current;
-
-    if (!currentMatchId || !socketRef.current) {
-      return;
-    }
-
-    setState((previous) => ({ ...previous, status: 'connecting', error: null }));
-
-    try {
-      const localStream = await acquireLocalMedia();
-      localStreamRef.current = localStream;
-
-      createPeer(localStream);
+      // Un appel entrant est déjà en cours de traitement : il ne doit pas être
+      // masqué par une demande concurrente.
+      if (incomingCallRef.current) {
+        return;
+      }
 
       setState((previous) => ({
         ...previous,
-        localStream,
-        isMicrophoneEnabled: true,
-        isCameraEnabled: true,
+        status: 'requesting',
+        error: null,
+        notice: options.automatic
+          ? 'Appel vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
+          : previous.notice,
+      }));
+      isCallerRef.current = true;
+
+      try {
+        const localStream = await acquireLocalMedia();
+        localStreamRef.current = localStream;
+
+        setState((previous) => ({
+          ...previous,
+          localStream,
+          isMicrophoneEnabled: true,
+          isCameraEnabled: true,
+        }));
+
+        // Une demande entrante a pu être reçue pendant l'obtention des
+        // médias : l'utilisateur est alors l'appelé et aucune demande
+        // concurrente ne doit être émise.
+        if (!isCallerRef.current) {
+          return;
+        }
+
+        socketRef.current.emit('media:request', {
+          matchId: currentMatchId,
+          audio: true,
+          video: true,
+        });
+
+        // Sans réponse du partenaire, l'appel ne doit pas rester en attente
+        // indéfiniment.
+        armConnectionTimeout();
+      } catch (error) {
+        resetCall({
+          error:
+            error instanceof Error && error.message === 'MEDIA_UNSUPPORTED'
+              ? 'Votre navigateur ne permet pas d’accéder à la caméra ou au micro.'
+              : describeMediaError(error),
+        });
+      }
+    },
+    [acquireLocalMedia, armConnectionTimeout, resetCall],
+  );
+
+  const acceptCall = useCallback(
+    async (options: { automatic?: boolean } = {}): Promise<void> => {
+      const currentMatchId = matchIdRef.current;
+
+      if (!currentMatchId || !socketRef.current) {
+        return;
+      }
+
+      setState((previous) => ({
+        ...previous,
+        status: 'connecting',
+        error: null,
+        notice: options.automatic
+          ? 'Appel vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
+          : previous.notice,
       }));
 
-      socketRef.current.emit('media:accept', { matchId: currentMatchId });
+      try {
+        // Le flux local est réutilisé s'il a déjà été obtenu (appel automatique
+        // demandé puis appel entrant reçu) : la caméra n'est pas ouverte deux fois.
+        const localStream = localStreamRef.current ?? (await acquireLocalMedia());
+        localStreamRef.current = localStream;
 
-      // Si l'appelant n'envoie jamais d'offre, l'appel ne doit pas rester
-      // bloqué indéfiniment sur « Connexion à l'appel… ».
-      armConnectionTimeout();
-    } catch (error) {
-      resetCall({
-        error:
-          error instanceof Error && error.message === 'MEDIA_UNSUPPORTED'
-            ? 'Votre navigateur ne permet pas d’accéder à la caméra ou au micro.'
-            : describeMediaError(error),
-      });
-    }
-  }, [acquireLocalMedia, armConnectionTimeout, createPeer, resetCall]);
+        if (!peerRef.current) {
+          createPeer(localStream);
+        }
+
+        setState((previous) => ({
+          ...previous,
+          localStream,
+          isMicrophoneEnabled: true,
+          isCameraEnabled: true,
+        }));
+
+        socketRef.current.emit('media:accept', { matchId: currentMatchId });
+
+        // Si l'appelant n'envoie jamais d'offre, l'appel ne doit pas rester
+        // bloqué indéfiniment sur « Connexion à l'appel… ».
+        armConnectionTimeout();
+      } catch (error) {
+        resetCall({
+          error:
+            error instanceof Error && error.message === 'MEDIA_UNSUPPORTED'
+              ? 'Votre navigateur ne permet pas d’accéder à la caméra ou au micro.'
+              : describeMediaError(error),
+        });
+      }
+    },
+    [acquireLocalMedia, armConnectionTimeout, createPeer, resetCall],
+  );
 
   const declineCall = useCallback((): void => {
     const currentMatchId = matchIdRef.current;

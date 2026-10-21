@@ -245,11 +245,8 @@ describe('Appel audiovisuel', () => {
     expect(await screen.findByRole('button', { name: '📹 Appeler' })).toBeInTheDocument();
   });
 
-  it('demande l’accès aux médias puis émet la demande d’appel', async () => {
-    const user = userEvent.setup();
+  it('lance l’appel vidéo automatiquement dès qu’un partenaire est trouvé', async () => {
     await enterSession();
-
-    await user.click(await screen.findByRole('button', { name: '📹 Appeler' }));
 
     await waitFor(() => {
       expect(getUserMediaMock).toHaveBeenCalledTimes(1);
@@ -261,47 +258,63 @@ describe('Appel audiovisuel', () => {
     });
 
     expect(await screen.findByText('Appel en cours…')).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Appel vidéo automatique : autorisez l’accès à la caméra/),
+    ).toBeInTheDocument();
   });
 
-  it('affiche l’appel entrant et permet de le refuser', async () => {
-    const user = userEvent.setup();
+  it('accepte automatiquement l’appel entrant', async () => {
     await enterSession();
 
     await deliver('media:request', { matchId: 'match-1', audio: true, video: true });
-
-    expect(await screen.findByText(/Appel entrant/)).toBeInTheDocument();
-    expect(screen.getByText('Mety-CD34 vous appelle.')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Refuser' }));
-
-    await waitFor(() => {
-      expect(fakeSocket.emitted.some((entry) => entry.event === 'media:end')).toBe(true);
-    });
-  });
-
-  it('accepte l’appel entrant et récupère les médias', async () => {
-    const user = userEvent.setup();
-    await enterSession();
-
-    await deliver('media:request', { matchId: 'match-1', audio: true, video: true });
-
-    await user.click(await screen.findByRole('button', { name: 'Accepter' }));
-
-    await waitFor(() => {
-      expect(getUserMediaMock).toHaveBeenCalledTimes(1);
-    });
 
     await waitFor(() => {
       const accept = fakeSocket.emitted.find((entry) => entry.event === 'media:accept');
       expect(accept?.payload).toEqual({ matchId: 'match-1' });
     });
+
+    expect(await screen.findByText('Connexion à l’appel…')).toBeInTheDocument();
   });
 
-  it('n’émet une offre que depuis l’appelant', async () => {
+  it('permet de relancer l’appel manuellement après un raccrochage', async () => {
     const user = userEvent.setup();
     await enterSession();
 
+    await waitFor(() => {
+      expect(fakeSocket.emitted.some((entry) => entry.event === 'media:request')).toBe(true);
+    });
+
+    await deliver('media:ended', { matchId: 'match-1', reason: 'hangup' });
+
+    fakeSocket.emitted.length = 0;
+
     await user.click(await screen.findByRole('button', { name: '📹 Appeler' }));
+
+    await waitFor(() => {
+      const request = fakeSocket.emitted.find((entry) => entry.event === 'media:request');
+      expect(request?.payload).toEqual({ matchId: 'match-1', audio: true, video: true });
+    });
+  });
+
+  it('n’émet qu’une seule demande d’appel lorsqu’un appel entrant arrive', async () => {
+    await enterSession();
+
+    await deliver('media:request', { matchId: 'match-1', audio: true, video: true });
+
+    await waitFor(() => {
+      expect(fakeSocket.emitted.some((entry) => entry.event === 'media:accept')).toBe(true);
+    });
+
+    // La demande automatique a pu partir avant l'appel entrant : aucune
+    // seconde demande concurrente ne doit être émise.
+    const requests = fakeSocket.emitted.filter((entry) => entry.event === 'media:request');
+
+    expect(requests.length).toBeLessThanOrEqual(1);
+  });
+
+  it('n’émet une offre que depuis l’appelant', async () => {
+    await enterSession();
+
     await waitFor(() => {
       expect(fakeSocket.emitted.some((entry) => entry.event === 'media:request')).toBe(true);
     });
@@ -319,10 +332,7 @@ describe('Appel audiovisuel', () => {
       new DOMException('Permission refusée', 'NotAllowedError'),
     );
 
-    const user = userEvent.setup();
     await enterSession();
-
-    await user.click(await screen.findByRole('button', { name: '📹 Appeler' }));
 
     expect(
       await screen.findByText('L’accès à la caméra ou au micro a été refusé.'),
@@ -334,14 +344,24 @@ describe('Appel audiovisuel', () => {
 
     await deliver('media:request', { matchId: 'autre-session', audio: true, video: true });
 
-    expect(screen.queryByText('Appel entrant')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Appel entrant/)).not.toBeInTheDocument();
+    expect(fakeSocket.emitted.some((entry) => entry.event === 'media:accept')).toBe(false);
+  });
+
+  it('ignore la demande concurrente rejetée par le serveur', async () => {
+    await enterSession();
+
+    await deliver('chat:error', {
+      code: 'CALL_ALREADY_ACTIVE',
+      message: 'Un appel est déjà en cours.',
+    });
+
+    expect(screen.queryByText('Un appel est déjà en cours.')).not.toBeInTheDocument();
   });
 
   it('signale la fin de l’appel lorsque le partenaire raccroche', async () => {
-    const user = userEvent.setup();
     await enterSession();
 
-    await user.click(await screen.findByRole('button', { name: '📹 Appeler' }));
     await waitFor(() => {
       expect(fakeSocket.emitted.some((entry) => entry.event === 'media:request')).toBe(true);
     });
@@ -352,10 +372,8 @@ describe('Appel audiovisuel', () => {
   });
 
   it('bascule en « en cours » quand la connexion pair-à-pair s’établit', async () => {
-    const user = userEvent.setup();
     await enterSession();
 
-    await user.click(await screen.findByRole('button', { name: '📹 Appeler' }));
     await waitFor(() => {
       expect(fakeSocket.emitted.some((entry) => entry.event === 'media:request')).toBe(true);
     });
@@ -386,11 +404,9 @@ describe('Appel audiovisuel', () => {
     // distante : le statut « en cours » ne doit pas être écrasé ensuite.
     FakePeerConnection.autoTrackOnRemoteDescription = true;
 
-    const user = userEvent.setup();
     await enterSession();
 
     await deliver('media:request', { matchId: 'match-1', audio: true, video: true });
-    await user.click(await screen.findByRole('button', { name: 'Accepter' }));
 
     await waitFor(() => {
       expect(fakeSocket.emitted.some((entry) => entry.event === 'media:accept')).toBe(true);

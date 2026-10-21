@@ -11,7 +11,7 @@ interface EmittedEvent {
   payload?: unknown;
 }
 
-const { fakeSocket } = vi.hoisted(() => {
+const { fakeSocket, getUserMediaMock } = vi.hoisted(() => {
   class FakeSocket {
     connected = true;
     readonly emitted: EmittedEvent[] = [];
@@ -40,8 +40,12 @@ const { fakeSocket } = vi.hoisted(() => {
 
     emit(event: string, ...args: unknown[]): boolean {
       this.emitted.push({ event, payload: args[0] });
-      this.listeners.get(event)?.forEach((listener) => listener(args[0]));
       return true;
+    }
+
+    /** Émission du serveur vers ce client. */
+    deliver(event: string, payload?: unknown): void {
+      this.listeners.get(event)?.forEach((listener) => listener(payload));
     }
 
     disconnect(): void {
@@ -49,8 +53,53 @@ const { fakeSocket } = vi.hoisted(() => {
     }
   }
 
-  return { fakeSocket: new FakeSocket() };
+  const getUserMediaMock = vi.fn(async () => ({
+    getTracks: () => [],
+    getAudioTracks: () => [],
+    getVideoTracks: () => [],
+  }));
+
+  return { fakeSocket: new FakeSocket(), getUserMediaMock };
 });
+
+/**
+ * Fausse implémentation de `RTCPeerConnection` : jsdom ne fournit pas
+ * l'API WebRTC.
+ */
+class FakePeerConnection {
+  onicecandidate: ((event: { candidate: unknown }) => void) | null = null;
+  ontrack: ((event: unknown) => void) | null = null;
+  onconnectionstatechange: (() => void) | null = null;
+  connectionState = 'new';
+  localDescription: unknown = null;
+  remoteDescription: unknown = null;
+
+  addTrack(): void {}
+
+  createOffer(): Promise<unknown> {
+    return Promise.resolve({ type: 'offer', sdp: 'v=0' });
+  }
+
+  createAnswer(): Promise<unknown> {
+    return Promise.resolve({ type: 'answer', sdp: 'v=0' });
+  }
+
+  setLocalDescription(description: unknown): Promise<void> {
+    this.localDescription = description;
+    return Promise.resolve();
+  }
+
+  setRemoteDescription(description: unknown): Promise<void> {
+    this.remoteDescription = description;
+    return Promise.resolve();
+  }
+
+  addIceCandidate(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  close(): void {}
+}
 
 vi.mock('../src/lib/socket-client', () => ({
   createChatSocket: () => fakeSocket as unknown as Socket,
@@ -77,10 +126,10 @@ vi.mock('../src/lib/api-client', async (importOriginal) => {
   };
 });
 
-/** Émet un événement temps réel en enveloppant la mise à jour React dans `act`. */
+/** Simule une émission du serveur vers le client. */
 const emit = async (event: string, payload?: unknown): Promise<void> => {
   await act(async () => {
-    fakeSocket.emit(event, payload);
+    fakeSocket.deliver(event, payload);
   });
 };
 
@@ -108,7 +157,15 @@ describe('Page de chat', () => {
     fakeSocket.removeAllListeners();
     fakeSocket.emitted.length = 0;
     fakeSocket.connected = true;
+    getUserMediaMock.mockClear();
     window.localStorage.setItem('i-keketa.auth.token', 'jeton-de-test');
+
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: getUserMediaMock },
+    });
+
+    vi.stubGlobal('RTCPeerConnection', FakePeerConnection);
   });
 
   it('propose de trouver un partenaire au démarrage', async () => {
@@ -149,6 +206,19 @@ describe('Page de chat', () => {
       const sent = fakeSocket.emitted.find((entry) => entry.event === 'chat:message');
       expect(sent?.payload).toEqual({ matchId: 'match-1', content: 'Salut !' });
     });
+  });
+
+  it('lance automatiquement l’appel vidéo après la mise en relation', async () => {
+    await renderChatPage();
+
+    await emit('match:found', { matchId: 'match-1', partner: { pseudonym: 'Mety-CD34' } });
+
+    await waitFor(() => {
+      const request = fakeSocket.emitted.find((entry) => entry.event === 'media:request');
+      expect(request?.payload).toEqual({ matchId: 'match-1', audio: true, video: true });
+    });
+
+    expect(await screen.findByText('Appel en cours…')).toBeInTheDocument();
   });
 
   it('affiche les messages reçus en temps réel', async () => {

@@ -20,7 +20,8 @@ Ce dépôt contient l'implémentation des **Sprints 1, 2 et 3** (voir `docs/prod
 
 **Sprint 3**
 
-- **Appel audiovisuel** (WebRTC pair-à-pair, signalisation relayée par Socket.IO, micro et caméra)
+- **Appel audiovisuel** (WebRTC pair-à-pair, signalisation relayée par Socket.IO, micro et caméra,
+  lancé automatiquement dès la mise en relation)
 - **Signalement d'abus** (motif, descriptif facultatif, statut `pending`)
 
 > La **modération** n'est pas implémentée : les signalements sont enregistrés et restent au statut
@@ -112,8 +113,9 @@ $env:VITE_API_PROXY_TARGET="http://localhost:3100"; npm run dev:frontend
    « Discuter » pour démarrer une discussion directe.
 4. **Discussion** (`/chat`) — mise en relation aléatoire (file d'attente) ou session directe déjà
    initiée. Le partenaire est identifié par son pseudonyme, et par son nom/photo s'il les a
-   renseignés. Le bouton « Appeler » démarre un appel audiovisuel (le navigateur demande l'accès
-   au micro et à la caméra) ; le bouton « Signaler » ouvre le formulaire de signalement d'abus.
+   renseignés. L'appel audiovisuel démarre **automatiquement** dès la mise en relation (le
+   navigateur demande l'accès au micro et à la caméra) ; le bouton « Appeler » permet de relancer
+   un appel arrêté, le bouton « Signaler » ouvre le formulaire de signalement d'abus.
 
 ## API Sprint 2
 

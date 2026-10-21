@@ -64,6 +64,43 @@ export const ChatPage = () => {
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportSuccess, setReportSuccess] = useState<string | null>(null);
 
+  /** Session de chat pour laquelle l'appel vidéo a déjà été lancé. */
+  const autoCallMatchRef = useRef<string | null>(null);
+  /** Session de chat pour laquelle l'appel entrant a déjà été accepté. */
+  const autoAcceptMatchRef = useRef<string | null>(null);
+
+  // L'appel vidéo se lance automatiquement dès qu'un partenaire est trouvé.
+  useEffect(() => {
+    if (!matchId || autoCallMatchRef.current === matchId) {
+      return;
+    }
+
+    if (connectionStatus !== 'connected') {
+      return;
+    }
+
+    autoCallMatchRef.current = matchId;
+
+    void startCall({ automatic: true });
+  }, [matchId, connectionStatus, startCall]);
+
+  // L'appel entrant est accepté automatiquement : la conversation vidéo
+  // démarre sans action supplémentaire de l'utilisateur.
+  useEffect(() => {
+    if (callStatus !== 'ringing') {
+      autoAcceptMatchRef.current = null;
+      return;
+    }
+
+    if (!matchId || autoAcceptMatchRef.current === matchId) {
+      return;
+    }
+
+    autoAcceptMatchRef.current = matchId;
+
+    void acceptCall({ automatic: true });
+  }, [callStatus, matchId, acceptCall]);
+
   // Défile automatiquement vers le dernier message reçu.
   useEffect(() => {
     const list = messageListRef.current;

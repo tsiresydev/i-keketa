@@ -121,6 +121,17 @@ export class MediaSignalingService {
       return;
     }
 
+    // La session d'appel est réservée avant l'écriture en base : l'appel vidéo
+    // étant proposé automatiquement par les deux participants, deux demandes
+    // simultanées ne doivent pas créer deux appels concurrents.
+    const call: ActiveCall = {
+      sessionId: '',
+      callerSocketId: socket.id,
+      calleeSocketId: active.partnerSocketId,
+    };
+
+    this.activeCalls.set(matchId, call);
+
     try {
       const session = await CallSessionModel.create({
         matchId: new Types.ObjectId(matchId),
@@ -130,11 +141,7 @@ export class MediaSignalingService {
         video,
       });
 
-      this.activeCalls.set(matchId, {
-        sessionId: String(session._id),
-        callerSocketId: socket.id,
-        calleeSocketId: active.partnerSocketId,
-      });
+      call.sessionId = String(session._id);
 
       // Une demande d'appel sans réponse est close après un délai.
       const timeout = setTimeout(() => {
@@ -144,6 +151,8 @@ export class MediaSignalingService {
       timeout.unref();
       this.pendingTimeouts.set(matchId, timeout);
     } catch (error) {
+      this.activeCalls.delete(matchId);
+
       logger.error('Impossible de créer la session d’appel.', {
         matchId,
         error: error instanceof Error ? error.message : String(error),
@@ -167,6 +176,13 @@ export class MediaSignalingService {
     const call = this.activeCalls.get(matchId);
 
     if (!call) {
+      return;
+    }
+
+    if (!call.sessionId) {
+      // La session d'appel n'a pas encore été enregistrée : rien à clore.
+      this.activeCalls.delete(matchId);
+      this.clearPendingTimeout(matchId);
       return;
     }
 
@@ -223,7 +239,7 @@ export class MediaSignalingService {
 
     const call = this.activeCalls.get(matchId);
 
-    if (!call) {
+    if (!call || !call.sessionId) {
       socket.emit('chat:error', {
         code: MEDIA_ERROR_CODES.CALL_NOT_FOUND,
         message: 'Aucun appel en attente.',
@@ -309,6 +325,14 @@ export class MediaSignalingService {
     const call = this.activeCalls.get(matchId);
 
     if (!call) {
+      return;
+    }
+
+    if (!call.sessionId) {
+      // La session d'appel n'a pas encore été enregistrée : il n'y a rien à
+      // clore, seule la réservation est levée.
+      this.activeCalls.delete(matchId);
+      this.clearPendingTimeout(matchId);
       return;
     }
 
