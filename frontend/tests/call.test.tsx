@@ -132,7 +132,7 @@ const enterSession = async (): Promise<void> => {
   const user = userEvent.setup();
   await renderChatPage();
 
-  await user.click(await screen.findByRole('button', { name: 'Trouver un adversaire' }));
+  await user.click(await screen.findByRole('button', { name: 'Trouver un inconnu' }));
   await deliver('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 };
 
@@ -223,10 +223,12 @@ describe('Appel audiovisuel', () => {
     vi.stubGlobal('RTCPeerConnection', FakePeerConnection);
   });
 
-  it('propose de lancer un match une fois la session établie', async () => {
+  it('propose de lancer un appel vidéo une fois la session établie', async () => {
     await enterSession();
 
-    expect(await screen.findByRole('button', { name: '📹 Lancer le match' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: '📹 Lancer l’appel vidéo' }),
+    ).toBeInTheDocument();
   });
 
   it('lance automatiquement l’appel vidéo dès qu’un partenaire est trouvé', async () => {
@@ -241,9 +243,9 @@ describe('Appel audiovisuel', () => {
       expect(request?.payload).toEqual({ matchId: 'match-1', audio: true, video: true });
     });
 
-    expect(await screen.findByText('Match en cours…')).toBeInTheDocument();
+    expect(await screen.findByText('Appel en cours…')).toBeInTheDocument();
     expect(
-      await screen.findByText(/Match vidéo automatique : autorisez l’accès à la caméra/),
+      await screen.findByText(/Appel vidéo automatique : autorisez l’accès à la caméra/),
     ).toBeInTheDocument();
   });
 
@@ -257,10 +259,10 @@ describe('Appel audiovisuel', () => {
       expect(accept?.payload).toEqual({ matchId: 'match-1' });
     });
 
-    expect(await screen.findByText('Coup d’envoi…')).toBeInTheDocument();
+    expect(await screen.findByText('Connexion à l’appel…')).toBeInTheDocument();
   });
 
-  it('permet de relancer le match manuellement après un raccrochage', async () => {
+  it('permet de relancer l’appel vidéo manuellement après un raccrochage', async () => {
     const user = userEvent.setup();
     await enterSession();
 
@@ -272,7 +274,7 @@ describe('Appel audiovisuel', () => {
 
     fakeSocket.emitted.length = 0;
 
-    await user.click(await screen.findByRole('button', { name: '📹 Lancer le match' }));
+    await user.click(await screen.findByRole('button', { name: '📹 Lancer l’appel vidéo' }));
 
     await waitFor(() => {
       const request = fakeSocket.emitted.find((entry) => entry.event === 'media:request');
@@ -328,7 +330,7 @@ describe('Appel audiovisuel', () => {
 
     await deliver('media:request', { matchId: 'autre-session', audio: true, video: true });
 
-    expect(screen.queryByText(/Match entrant/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Appel entrant/)).not.toBeInTheDocument();
     expect(fakeSocket.emitted.some((entry) => entry.event === 'media:accept')).toBe(false);
   });
 
@@ -352,7 +354,7 @@ describe('Appel audiovisuel', () => {
 
     await deliver('media:ended', { matchId: 'match-1', reason: 'hangup' });
 
-    expect(await screen.findByText('Votre partenaire a quitté le match.')).toBeInTheDocument();
+    expect(await screen.findByText('Votre partenaire a raccroché.')).toBeInTheDocument();
   });
 
   it('bascule en « en cours » quand la connexion pair-à-pair s’établit', async () => {
@@ -368,7 +370,7 @@ describe('Appel audiovisuel', () => {
       expect(fakeSocket.emitted.some((entry) => entry.event === 'media:offer')).toBe(true);
     });
 
-    expect(await screen.findByText('Coup d’envoi…')).toBeInTheDocument();
+    expect(await screen.findByText('Connexion à l’appel…')).toBeInTheDocument();
 
     const peer = FakePeerConnection.instances[0];
 
@@ -379,8 +381,8 @@ describe('Appel audiovisuel', () => {
       await flushPendingTasks();
     });
 
-    expect(screen.getByRole('region', { name: 'Match en cours' })).toBeInTheDocument();
-    expect(screen.queryByText('Coup d’envoi…')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Appel en cours' })).toBeInTheDocument();
+    expect(screen.queryByText('Connexion à l’appel…')).not.toBeInTheDocument();
   });
 
   it('ne rebascule pas en « connexion » après l’arrivée du flux distant', async () => {
@@ -407,7 +409,7 @@ describe('Appel audiovisuel', () => {
       await flushPendingTasks();
     });
 
-    expect(screen.getByRole('region', { name: 'Match en cours' })).toBeInTheDocument();
-    expect(screen.queryByText('Coup d’envoi…')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Appel en cours' })).toBeInTheDocument();
+    expect(screen.queryByText('Connexion à l’appel…')).not.toBeInTheDocument();
   });
 });

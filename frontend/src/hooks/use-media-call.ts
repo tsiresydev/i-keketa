@@ -499,9 +499,7 @@ export const useMediaCall = (
 
       resetCall({
         notice:
-          payload.reason === 'hangup'
-            ? 'Votre partenaire a quitté le match.'
-            : 'Le match est terminé.',
+          payload.reason === 'hangup' ? 'Votre partenaire a raccroché.' : 'L’appel est terminé.',
       });
     };
 
@@ -565,7 +563,7 @@ export const useMediaCall = (
         status: 'requesting',
         error: null,
         notice: options.automatic
-          ? 'Match vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
+          ? 'Appel vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
           : previous.notice,
       }));
       isCallerRef.current = true;
@@ -622,7 +620,7 @@ export const useMediaCall = (
         status: 'connecting',
         error: null,
         notice: options.automatic
-          ? 'Match vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
+          ? 'Appel vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
           : previous.notice,
       }));
 

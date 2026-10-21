@@ -48,10 +48,11 @@ export const HomePage = () => {
   return (
     <div className="home-page">
       <section className="home-page__hero">
-        <h1 className="home-page__title">Discutez en vidéo anonyme</h1>
+        <h1 className="home-page__title">Rencontrez des inconnus en vidéo</h1>
         <p className="home-page__text">
-          Entrez un nom affiché, soyez mis en relation avec une autre personne et échangez en vidéo.
-          Aucun compte, aucun mot de passe.
+          I-Keketa met en relation des inconnus de manière aléatoire pour discuter en vidéo, à
+          Madagascar. Entrez un nom affiché, soyez mis en relation avec un autre utilisateur et
+          échangez en visio. Aucun compte, aucun mot de passe.
         </p>
       </section>
 
@@ -67,7 +68,7 @@ export const HomePage = () => {
           disabled={isSubmitting || status === 'loading'}
           autoComplete="nickname"
           maxLength={40}
-          hint="2 à 40 caractères. Ce nom sera vu par votre partenaire."
+          hint="2 à 40 caractères. Ce nom sera vu par la personne avec qui vous discuterez."
         />
 
         <button type="submit" className="button" disabled={isSubmitting || status === 'loading'}>

@@ -134,7 +134,7 @@ export const ChatPage = () => {
               <span className="avatar avatar--md avatar--placeholder" aria-hidden="true">
                 {partnerInitial}
               </span>
-              <span className="partner-bar__label">Match avec</span>
+              <span className="partner-bar__label">Discussion avec</span>
               <span className="partner-bar__name">{partnerName}</span>
 
               <span className="partner-bar__actions">
@@ -144,7 +144,7 @@ export const ChatPage = () => {
                   onClick={() => void startCall()}
                   disabled={isCallActive || connectionStatus !== 'connected'}
                 >
-                  📹 Lancer le match
+                  📹 Lancer l’appel vidéo
                 </button>
               </span>
             </div>
@@ -189,10 +189,10 @@ export const ChatPage = () => {
         ) : chatStatus === 'waiting' ? (
           <section className="chat-panel" aria-live="polite">
             <div className="spinner" aria-hidden="true" />
-            <h2 className="chat-panel__title">Recherche d’un adversaire…</h2>
+            <h2 className="chat-panel__title">Recherche d’un inconnu…</h2>
             <p className="chat-panel__text">
-              Vous serez mis en relation avec un autre visiteur dès qu’un adversaire sera
-              disponible.
+              Vous serez mis en relation avec un autre utilisateur de la plateforme dès qu’un
+              partenaire sera disponible.
             </p>
             <div className="chat-panel__actions">
               <button type="button" className="button button--secondary" onClick={leaveQueue}>
@@ -204,8 +204,8 @@ export const ChatPage = () => {
           <section className="chat-panel">
             <h2 className="chat-panel__title">Prêt à discuter ?</h2>
             <p className="chat-panel__text">
-              Rejoignez la file d’attente pour être mis en relation avec un adversaire. Votre
-              identité reste anonyme.
+              Rejoignez la file d’attente pour être mis en relation aléatoirement avec un autre
+              utilisateur. Votre identité reste anonyme.
             </p>
             <div className="chat-panel__actions">
               <button
@@ -214,7 +214,7 @@ export const ChatPage = () => {
                 onClick={joinQueue}
                 disabled={connectionStatus !== 'connected'}
               >
-                {connectionStatus === 'connected' ? 'Trouver un adversaire' : 'Connexion en cours…'}
+                {connectionStatus === 'connected' ? 'Trouver un inconnu' : 'Connexion en cours…'}
               </button>
             </div>
           </section>
