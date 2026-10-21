@@ -22,13 +22,15 @@ Le fichier `render.yaml` (racine du dépôt) décrit le service sous forme de **
   - `MONGODB_URI` : URI du cluster **MongoDB Atlas M0** (gratuit) ;
   - `CORS_ORIGIN` : `https://i-keketa.vercel.app` ;
 - `JWT_SECRET` est généré automatiquement par Render ;
--Render installe les dépendances à la racine du monorepo (`npm ci`), puis compile le workspace
-  `backend` (`npm run build --workspace backend`) et lance `npm start`.
+- Render installe les dépendances à la racine du monorepo (`npm ci --include=dev`), puis compile
+  le workspace `backend` (`npm run build --workspace backend`) et lance `npm start`.
+- `--include=dev` est obligatoire : `NODE_ENV=production` fait omettre par npm les
+  devDependencies (dont TypeScript), ce qui fait échouer la compilation.
 
 Le service est vérifié via `GET /health` (`healthCheckPath`).
 
 > **Alternative sans Blueprint** : `New` → `Web Service` → brancher le dépôt, puis
-> *Root Directory* = `.`, *Build Command* = `npm ci && npm run build --workspace backend`,
+> *Root Directory* = `.`, *Build Command* = `npm ci --include=dev && npm run build --workspace backend`,
 > *Start Command* = `npm start`, *Health Check Path* = `/health`.
 
 ### 1.2 Variables d'environnement
@@ -120,3 +122,18 @@ node scripts/e2e-check.cjs https://i-keketa-api.onrender.com
 4. Vérifier `https://i-keketa-api.onrender.com/health` → `{"status":"ok"}`.
 5. Déployer le frontend sur Vercel avec `VITE_API_URL`.
 6. Tester l'inscription et la mise en relation depuis `https://i-keketa.vercel.app`.
+
+## 5. État du déploiement (21 octobre 2026)
+
+| Élément | Valeur |
+|---------|--------|
+| Service Render | `i-keketa-api` (`srv-dbc5ko3bc2fs73bcr40g`), plan `free`, région `frankfurt` |
+| URL backend | https://i-keketa-api.onrender.com |
+| Projet Vercel | `dev-mada1/i-keketa` (`prj_Ist9kvgm4iJ461b8NwFX3aBS8EAg`) |
+| URL frontend | https://i-keketa.vercel.app |
+| Déploiement Git | Automatique à chaque push sur `main` (Vercel et Render) |
+| Vérification E2E | `node scripts/e2e-check.cjs https://i-keketa-api.onrender.com` → 39/39 |
+
+Le `JWT_SECRET` et l'`MONGODB_URI` sont enregistrés dans les variables d'environnement du service
+Render (jamais versionnés). Pour les faire tourner, il faut les régénérer depuis le tableau de bord
+Render.

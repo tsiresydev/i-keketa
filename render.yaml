@@ -16,7 +16,9 @@ services:
     rootDir: .
     # Monorepo npm workspaces : l'installation se fait à la racine (package-lock.json),
     # le build du backend dans le workspace `backend`.
-    buildCommand: npm ci && npm run build --workspace backend
+    # `--include=dev` est indispensable : `NODE_ENV=production` fait omettre par npm
+    # les devDependencies (dont TypeScript), sans quoi la compilation échoue.
+    buildCommand: npm ci --include=dev && npm run build --workspace backend
     startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
