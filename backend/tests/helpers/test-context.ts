@@ -36,49 +36,35 @@ export const createTestContext = async (): Promise<TestContext> => {
   } as TestContext & { port: number };
 };
 
-export interface RegisteredUser {
+export interface TestSession {
   token: string;
   userId: string;
-  email: string;
-  pseudonym: string;
+  displayName: string;
 }
 
 let userCounter = 0;
 
-export const registerTestUser = async (
+/**
+ * Ouvre une session de test anonyme à partir du seul nom affiché.
+ */
+export const createTestSession = async (
   app: Express,
-  overrides: {
-    email?: string;
-    password?: string;
-    displayName?: string;
-    interests?: string[];
-    location?: string;
-  } = {},
-): Promise<RegisteredUser> => {
+  overrides: { displayName?: string } = {},
+): Promise<TestSession> => {
   userCounter += 1;
-  const email = overrides.email ?? `user${userCounter}-${Date.now()}@example.mg`;
-  const password = overrides.password ?? 'MotDePasse1';
+  const displayName = overrides.displayName ?? `Visiteur${userCounter}`;
 
-  const response = await request(app)
-    .post('/api/auth/register')
-    .send({
-      email,
-      password,
-      ...(overrides.displayName ? { displayName: overrides.displayName } : {}),
-      ...(overrides.interests ? { interests: overrides.interests } : {}),
-      ...(overrides.location ? { location: overrides.location } : {}),
-    });
+  const response = await request(app).post('/api/auth/session').send({ displayName });
 
   if (response.status !== 201) {
     throw new Error(
-      `Inscription de test impossible : ${response.status} ${JSON.stringify(response.body)}`,
+      `Session de test impossible : ${response.status} ${JSON.stringify(response.body)}`,
     );
   }
 
   return {
     token: response.body.token,
     userId: response.body.user.id,
-    email: response.body.user.email,
-    pseudonym: response.body.user.pseudonym,
+    displayName: response.body.user.displayName,
   };
 };

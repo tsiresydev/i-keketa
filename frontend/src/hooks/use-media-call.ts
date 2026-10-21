@@ -499,7 +499,9 @@ export const useMediaCall = (
 
       resetCall({
         notice:
-          payload.reason === 'hangup' ? 'Votre partenaire a raccroché.' : 'L’appel est terminé.',
+          payload.reason === 'hangup'
+            ? 'Votre partenaire a quitté le match.'
+            : 'Le match est terminé.',
       });
     };
 
@@ -563,7 +565,7 @@ export const useMediaCall = (
         status: 'requesting',
         error: null,
         notice: options.automatic
-          ? 'Appel vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
+          ? 'Match vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
           : previous.notice,
       }));
       isCallerRef.current = true;
@@ -620,7 +622,7 @@ export const useMediaCall = (
         status: 'connecting',
         error: null,
         notice: options.automatic
-          ? 'Appel vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
+          ? 'Match vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
           : previous.notice,
       }));
 
@@ -665,7 +667,7 @@ export const useMediaCall = (
       socketRef.current?.emit('media:end', { matchId: currentMatchId });
     }
 
-    resetCall({ notice: 'Appel refusé.' });
+    resetCall({ notice: 'Match refusé.' });
   }, [resetCall]);
 
   const endCall = useCallback((): void => {

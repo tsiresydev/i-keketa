@@ -7,18 +7,21 @@ Plateforme web responsive de chat en ligne pour utilisateurs de Madagascar, perm
 ## Objectif et périmètre
 
 - **Objectif** : faciliter les rencontres amicales entre utilisateurs de Madagascar, expérience fluide/intuitive, sécurité et confidentialité.
-- **Périmètre inclus** : inscription/connexion, chat aléatoire, messagerie texte temps réel, profil utilisateur, filtres de recherche, messagerie audiovisuelle, signalement d'abus, modération, déploiement Vercel/Render.
-- **Périmètre exclu** : non précisé dans le cahier des charges → à valider.
+- **Périmètre inclus** : session anonyme sans compte (aucun email ni mot de passe), chat aléatoire,
+  messagerie texte temps réel, messagerie audiovisuelle, signalement d'abus, modération, déploiement
+  Vercel/Render.
+- **Périmètre exclu** : inscription/connexion classiques, profil utilisateur et photo, filtres de
+  recherche, annuaire des utilisateurs, discussion directe entre deux utilisateurs ciblés (hors file
+  d'attente aléatoire).
 
 ## Fonctionnalités principales
 
-1. Inscription/connexion (email + mot de passe).
-2. Mise en relation aléatoire entre utilisateurs.
+1. Session anonyme : saisie d'un seul nom affiché (aucun compte, aucun email, aucun mot de passe).
+2. Mise en relation aléatoire entre visiteurs.
 3. Messagerie texte en temps réel.
-4. Profil utilisateur (nom, intérêts, photo).
-5. Filtres de recherche (intérêts, localisation).
-6. Messagerie audiovisuelle (chat vidéo/audio).
-7. Signalement d'abus.
+4. Messagerie audiovisuelle (chat vidéo/audio) avec appel automatique après la mise en relation.
+5. Signalement d'abus.
+6. Modération (hors périmètre : aucun outil de traitement).
 
 
 ## Stack technique confirmée / à valider
@@ -60,23 +63,29 @@ Frontend + backend séparés; API REST (proposée) entre les deux; DB MongoDB. D
   - Backend : Node.js 20 + Express 4 + TypeScript.
   - Temps réel : Socket.IO 4.
   - Base de données : MongoDB + Mongoose 8 (repli MongoDB en mémoire en développement).
-  - Authentification : JWT + bcrypt ; validation : Zod ; tests : Vitest.
+  - Authentification : jeton JWT signé à partir de l'identifiant de session (`sub`) ; aucun mot de passe
+  ni bcrypt ; validation : Zod ; tests : Vitest.
 
 ## État d'avancement
 
-- Sprint 1 (inscription/connexion, chat aléatoire, messagerie texte) : **implémenté et testé**.
-- Sprint 2 (profil utilisateur, filtres de recherche) : **implémenté et testé**.
+- Refonte majeure : **sessions anonymes sans inscription/connexion**. Suppression des pages Découvrir et
+  Profil, de l'annuaire des utilisateurs et de la discussion directe. Le visiteur saisit uniquement un
+  nom affiché et est mis en relation aléatoirement ; l'identifiant technique (pseudonyme) reste interne.
+- Sprint 1 (chat aléatoire, messagerie texte) : **implémenté et testé**.
+- Sprint 2 (profil, filtres de recherche) : **retiré** (hors périmètre de la refonte).
 - Sprint 3 (messagerie audiovisuelle, signalement) : **implémenté et testé**.
   - Signalisation WebRTC pair-à-pair relayée par Socket.IO (événements `media:*`), sessions d'appel
     (`CallSession`) et interface d'appel (`VideoCallPanel`).
   - **Appel vidéo lancé par défaut** : dès la mise en relation, la demande d'appel et l'acceptation
-    sont émises automatiquement (le rôle d'appelant reste exclusif) ; le bouton « Appeler » permet
-    de relancer un appel arrêté.
+    sont émises automatiquement (le rôle d'appelant reste exclusif) ; le bouton « Lancer le match »
+    permet de relancer un appel arrêté.
   - Signalement d'abus (`POST /api/reports`, `GET /api/reports/me`) : l'utilisateur signalé est
     toujours l'autre participant, un signalement par session et par auteur (`409`), statut
     `pending` uniquement.
   - **Modération hors périmètre** : aucun outil de traitement ni sanction ; les signalements sont
     seulement enregistrés.
+- Interface responsive et accessible mobile : CSS mobile-first, cibles tactiles ≥ 44 px, safe-area-inset,
+  modale plein écran sur mobile.
 
 ## Questions encore ouvertes
 

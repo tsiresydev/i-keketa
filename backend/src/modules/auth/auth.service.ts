@@ -1,94 +1,50 @@
 import { Types } from 'mongoose';
-import { UserModel, toPrivateUser, type PrivateUserDto } from '../../models/user.model';
-import { ApiError } from '../../utils/api-error';
-import { burnPasswordComparison, hashPassword, verifyPassword } from '../../utils/password';
+import { UserModel, toPublicUser, type PublicUserDto } from '../../models/user.model';
 import { signAccessToken } from '../../utils/jwt';
-import { generatePseudonym, normalizeInterests } from '../../utils/text';
-import type { LoginInput, RegisterInput } from '../../schemas/auth.schema';
+import { generatePseudonym } from '../../utils/text';
+import type { SessionInput } from '../../schemas/auth.schema';
 
-export interface AuthResult {
+export interface SessionResult {
   token: string;
-  user: PrivateUserDto;
+  user: PublicUserDto;
 }
-
-const DUMMY_PSEUDONYM = 'Anonyme-0000';
 
 const createUniquePseudonym = async (): Promise<string> => {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const pseudonym = generatePseudonym();
-    const exists = await UserModel.exists({ pseudonym });
-    if (!exists) {
+
+    if (!(await UserModel.exists({ pseudonym }))) {
       return pseudonym;
     }
   }
 
-  return `${DUMMY_PSEUDONYM}-${new Types.ObjectId().toString().slice(-6).toUpperCase()}`;
+  return `Anonyme-${new Types.ObjectId().toString().slice(-6).toUpperCase()}`;
 };
 
 /**
- * Inscription d'un nouvel utilisateur.
- * - L'email est normalisé en minuscules (unicité garantie par index unique).
- * - Le pseudonyme anonyme est généré par le serveur : l'utilisateur n'expose
- *   ni son email ni son identité à son partenaire de discussion.
- * - Le profil (nom, centres d'intérêt, localisation) est facultatif.
+ * Ouvre une session de discussion à partir du seul nom affiché saisi par le
+ * visiteur : aucun compte, aucun email, aucun mot de passe.
+ *
+ * Le pseudonyme anonyme est généré par le serveur et reste interne ; le
+ * partenaire ne voit que le nom affiché choisi par le visiteur.
  */
-export const registerUser = async ({
-  email,
-  password,
-  displayName,
-  interests,
-  location,
-}: RegisterInput): Promise<AuthResult> => {
-  const existingUser = await UserModel.exists({ email });
-
-  if (existingUser) {
-    throw ApiError.conflict('Un compte existe déjà avec cette adresse email.');
-  }
-
-  const passwordHash = await hashPassword(password);
+export const createSession = async ({ displayName }: SessionInput): Promise<SessionResult> => {
   const pseudonym = await createUniquePseudonym();
 
   const user = await UserModel.create({
-    email,
-    passwordHash,
     pseudonym,
-    ...(displayName ? { displayName } : {}),
-    ...(interests && interests.length > 0 ? { interests: normalizeInterests(interests) } : {}),
-    ...(location ? { location } : {}),
+    displayName,
   });
 
   return {
-    token: signAccessToken({ sub: String(user._id), email: user.email }),
-    user: toPrivateUser(user),
+    token: signAccessToken({ sub: String(user._id) }),
+    user: toPublicUser(user),
   };
 };
 
 /**
- * Connexion par email + mot de passe.
- * Le message d'erreur reste identique que l'email existe ou non (anti énumération de comptes).
- */
-export const loginUser = async ({ email, password }: LoginInput): Promise<AuthResult> => {
-  const user = await UserModel.findOne({ email }).select('+passwordHash');
-
-  if (!user) {
-    await burnPasswordComparison();
-    throw ApiError.unauthorized('Identifiants invalides.');
-  }
-
-  const isPasswordValid = await verifyPassword(password, user.passwordHash);
-
-  if (!isPasswordValid) {
-    throw ApiError.unauthorized('Identifiants invalides.');
-  }
-
-  return {
-    token: signAccessToken({ sub: String(user._id), email: user.email }),
-    user: toPrivateUser(user),
-  };
-};
-
-/**
- * Charge un utilisateur depuis son identifiant (utilisé par l'authentification).
+ * Charge un utilisateur depuis son identifiant (utilisé par le middleware
+ * d'authentification et par la socket temps réel).
  */
 export const findUserById = async (userId: string) => {
   if (!Types.ObjectId.isValid(userId)) {

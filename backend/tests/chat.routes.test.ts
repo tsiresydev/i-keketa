@@ -4,14 +4,14 @@ import { Types } from 'mongoose';
 import { createApp } from '../src/app';
 import { MatchModel } from '../src/models/match.model';
 import { MessageModel } from '../src/models/message.model';
-import { registerTestUser } from './helpers/test-context';
+import { createTestSession } from './helpers/test-context';
 
 const app = createApp();
 
 describe('GET /api/chat/matches/:matchId/messages', () => {
   it('renvoie l’historique aux participants de la session', async () => {
-    const alice = await registerTestUser(app);
-    const bob = await registerTestUser(app);
+    const alice = await createTestSession(app);
+    const bob = await createTestSession(app);
 
     const match = await MatchModel.create({
       participants: [new Types.ObjectId(alice.userId), new Types.ObjectId(bob.userId)],
@@ -35,9 +35,9 @@ describe('GET /api/chat/matches/:matchId/messages', () => {
   });
 
   it('refuse l’accès à un tiers', async () => {
-    const alice = await registerTestUser(app);
-    const bob = await registerTestUser(app);
-    const mallory = await registerTestUser(app);
+    const alice = await createTestSession(app);
+    const bob = await createTestSession(app);
+    const mallory = await createTestSession(app);
 
     const match = await MatchModel.create({
       participants: [new Types.ObjectId(alice.userId), new Types.ObjectId(bob.userId)],
@@ -52,7 +52,7 @@ describe('GET /api/chat/matches/:matchId/messages', () => {
   });
 
   it('renvoie 404 pour une session inconnue', async () => {
-    const alice = await registerTestUser(app);
+    const alice = await createTestSession(app);
 
     const response = await request(app)
       .get('/api/chat/matches/507f1f77bcf86cd799439011/messages')

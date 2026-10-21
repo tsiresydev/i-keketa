@@ -1,32 +1,25 @@
 ﻿import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { Alert } from '../components/Alert';
 import { AppHeader } from '../components/AppHeader';
 import { ChatComposer } from '../components/ChatComposer';
 import { MessageBubble } from '../components/MessageBubble';
 import { ReportDialog } from '../components/ReportDialog';
 import { VideoCallPanel } from '../components/VideoCallPanel';
-import { useAuth } from '../hooks/use-auth';
+import { useSession } from '../hooks/use-session';
 import { useChatSocket } from '../hooks/use-chat-socket';
 import { useMediaCall } from '../hooks/use-media-call';
 import { reportsApi } from '../lib/api-client';
 import type { ReportReason } from '../types';
 
 export const ChatPage = () => {
-  const { user, token } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, token } = useSession();
   const messageListRef = useRef<HTMLUListElement>(null);
-
-  const [pendingTarget, setPendingTarget] = useState<string | null>(null);
-  const searchKey = searchParams.toString();
 
   const {
     connectionStatus,
     chatStatus,
     matchId,
-    partnerPseudonym,
     partnerDisplayName,
-    partnerPhotoUrl,
     messages,
     error,
     notice,
@@ -34,7 +27,6 @@ export const ChatPage = () => {
     joinQueue,
     leaveQueue,
     skipPartner,
-    startDirectChat,
     sendMessage,
     clearError,
     clearNotice,
@@ -110,26 +102,6 @@ export const ChatPage = () => {
     }
   }, [messages]);
 
-  // Cible d'une discussion directe demandée depuis la page « Découvrir ».
-  useEffect(() => {
-    const target = new URLSearchParams(searchKey).get('user');
-
-    if (target) {
-      setPendingTarget(target);
-    }
-  }, [searchKey]);
-
-  // La discussion directe est lancée dès que la connexion temps réel est prête.
-  useEffect(() => {
-    if (connectionStatus !== 'connected' || !pendingTarget) {
-      return;
-    }
-
-    setPendingTarget(null);
-    setSearchParams({}, { replace: true });
-    startDirectChat(pendingTarget);
-  }, [connectionStatus, pendingTarget, startDirectChat, setSearchParams]);
-
   const handleReport = async (reason: ReportReason, details: string): Promise<void> => {
     if (!token || !matchId) {
       return;
@@ -159,7 +131,7 @@ export const ChatPage = () => {
   };
 
   const isMatched = chatStatus === 'matched' && matchId !== null;
-  const partnerName = partnerDisplayName ?? partnerPseudonym ?? '';
+  const partnerName = partnerDisplayName ?? '';
   const partnerInitial = partnerName.slice(0, 1).toUpperCase();
   const isCallActive = callStatus !== 'idle';
 
@@ -201,23 +173,11 @@ export const ChatPage = () => {
         {isMatched ? (
           <>
             <div className="partner-bar">
-              {partnerPhotoUrl ? (
-                <img
-                  className="avatar avatar--md"
-                  src={partnerPhotoUrl}
-                  alt=""
-                  aria-hidden="true"
-                />
-              ) : (
-                <span className="avatar avatar--md avatar--placeholder" aria-hidden="true">
-                  {partnerInitial}
-                </span>
-              )}
-              <span className="partner-bar__label">Discussion avec</span>
+              <span className="avatar avatar--md avatar--placeholder" aria-hidden="true">
+                {partnerInitial}
+              </span>
+              <span className="partner-bar__label">Match avec</span>
               <span className="partner-bar__name">{partnerName}</span>
-              {partnerDisplayName && partnerPseudonym ? (
-                <span className="partner-bar__pseudonym">({partnerPseudonym})</span>
-              ) : null}
 
               <span className="partner-bar__actions">
                 <button
@@ -226,7 +186,7 @@ export const ChatPage = () => {
                   onClick={() => void startCall()}
                   disabled={isCallActive || connectionStatus !== 'connected'}
                 >
-                  📹 Appeler
+                  📹 Lancer le match
                 </button>
                 <button
                   type="button"
@@ -281,9 +241,10 @@ export const ChatPage = () => {
         ) : chatStatus === 'waiting' ? (
           <section className="chat-panel" aria-live="polite">
             <div className="spinner" aria-hidden="true" />
-            <h2 className="chat-panel__title">Recherche d’un partenaire…</h2>
+            <h2 className="chat-panel__title">Recherche d’un adversaire…</h2>
             <p className="chat-panel__text">
-              Vous serez mis en relation avec une autre personne de la plateforme dès que possible.
+              Vous serez mis en relation avec un autre visiteur dès qu’un adversaire sera
+              disponible.
             </p>
             <div className="chat-panel__actions">
               <button type="button" className="button button--secondary" onClick={leaveQueue}>
@@ -295,8 +256,8 @@ export const ChatPage = () => {
           <section className="chat-panel">
             <h2 className="chat-panel__title">Prêt à discuter ?</h2>
             <p className="chat-panel__text">
-              Rejoignez la file d’attente pour être mis en relation aléatoirement avec un autre
-              utilisateur. Votre identité reste anonyme.
+              Rejoignez la file d’attente pour être mis en relation avec un adversaire. Votre
+              identité reste anonyme.
             </p>
             <div className="chat-panel__actions">
               <button
@@ -305,7 +266,7 @@ export const ChatPage = () => {
                 onClick={joinQueue}
                 disabled={connectionStatus !== 'connected'}
               >
-                {connectionStatus === 'connected' ? 'Trouver quelqu’un' : 'Connexion en cours…'}
+                {connectionStatus === 'connected' ? 'Trouver un adversaire' : 'Connexion en cours…'}
               </button>
             </div>
           </section>

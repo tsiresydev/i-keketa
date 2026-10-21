@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Socket } from 'socket.io-client';
-import { AuthProvider } from '../src/context/auth-provider';
+import { SessionProvider } from '../src/context/session-provider';
 import { ChatPage } from '../src/pages/ChatPage';
 
 interface EmittedEvent {
@@ -115,10 +115,8 @@ vi.mock('../src/lib/api-client', async (importOriginal) => {
       me: vi.fn().mockResolvedValue({
         user: {
           id: 'user-1',
-          email: 'rakoto@example.mg',
-          pseudonym: 'Tsara-AB12',
+          displayName: 'Rakoto',
           role: 'user',
-          interests: [],
           createdAt: '2026-01-01T00:00:00.000Z',
         },
       }),
@@ -136,13 +134,13 @@ const emit = async (event: string, payload?: unknown): Promise<void> => {
 const renderChatPage = async (initialEntry = '/chat') => {
   const view = render(
     <MemoryRouter initialEntries={[initialEntry]}>
-      <AuthProvider>
+      <SessionProvider>
         <ChatPage />
-      </AuthProvider>
+      </SessionProvider>
     </MemoryRouter>,
   );
 
-  // La connexion temps réel n’est ouverte qu’une fois la session restaurée.
+  // La connexion temps réel n'est ouverte qu'une fois la session restaurée.
   await waitFor(() => {
     expect(fakeSocket.listenerCount('connect')).toBeGreaterThan(0);
   });
@@ -158,7 +156,7 @@ describe('Page de chat', () => {
     fakeSocket.emitted.length = 0;
     fakeSocket.connected = true;
     getUserMediaMock.mockClear();
-    window.localStorage.setItem('i-keketa.auth.token', 'jeton-de-test');
+    window.localStorage.setItem('i-keketa.session.token', 'jeton-de-test');
 
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
@@ -168,17 +166,19 @@ describe('Page de chat', () => {
     vi.stubGlobal('RTCPeerConnection', FakePeerConnection);
   });
 
-  it('propose de trouver un partenaire au démarrage', async () => {
+  it('propose de trouver un adversaire au démarrage', async () => {
     await renderChatPage();
 
-    expect(await screen.findByRole('button', { name: 'Trouver quelqu’un' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Trouver un adversaire' }),
+    ).toBeInTheDocument();
   });
 
   it('rejoint la file d’attente et affiche l’état d’attente', async () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver quelqu’un' }));
+    await user.click(await screen.findByRole('button', { name: 'Trouver un adversaire' }));
 
     await waitFor(() => {
       expect(fakeSocket.emitted.some((entry) => entry.event === 'queue:join')).toBe(true);
@@ -186,18 +186,18 @@ describe('Page de chat', () => {
 
     await emit('queue:status', { status: 'waiting', position: 1 });
 
-    expect(await screen.findByText('Recherche d’un partenaire…')).toBeInTheDocument();
+    expect(await screen.findByText('Recherche d’un adversaire…')).toBeInTheDocument();
   });
 
   it('affiche le partenaire et permet d’envoyer un message', async () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver quelqu’un' }));
+    await user.click(await screen.findByRole('button', { name: 'Trouver un adversaire' }));
 
-    await emit('match:found', { matchId: 'match-1', partner: { pseudonym: 'Mety-CD34' } });
+    await emit('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 
-    expect(await screen.findByText('Mety-CD34')).toBeInTheDocument();
+    expect(await screen.findByText('Miora')).toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Votre message'), 'Salut !');
     await user.click(screen.getByRole('button', { name: 'Envoyer' }));
@@ -211,22 +211,22 @@ describe('Page de chat', () => {
   it('lance automatiquement l’appel vidéo après la mise en relation', async () => {
     await renderChatPage();
 
-    await emit('match:found', { matchId: 'match-1', partner: { pseudonym: 'Mety-CD34' } });
+    await emit('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 
     await waitFor(() => {
       const request = fakeSocket.emitted.find((entry) => entry.event === 'media:request');
       expect(request?.payload).toEqual({ matchId: 'match-1', audio: true, video: true });
     });
 
-    expect(await screen.findByText('Appel en cours…')).toBeInTheDocument();
+    expect(await screen.findByText('Match en cours…')).toBeInTheDocument();
   });
 
   it('affiche les messages reçus en temps réel', async () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver quelqu’un' }));
-    await emit('match:found', { matchId: 'match-1', partner: { pseudonym: 'Mety-CD34' } });
+    await user.click(await screen.findByRole('button', { name: 'Trouver un adversaire' }));
+    await emit('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 
     await emit('chat:message', {
       message: {
@@ -245,7 +245,7 @@ describe('Page de chat', () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver quelqu’un' }));
+    await user.click(await screen.findByRole('button', { name: 'Trouver un adversaire' }));
 
     await emit('chat:error', {
       code: 'RATE_LIMITED',
@@ -261,8 +261,8 @@ describe('Page de chat', () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver quelqu’un' }));
-    await emit('match:found', { matchId: 'match-1', partner: { pseudonym: 'Mety-CD34' } });
+    await user.click(await screen.findByRole('button', { name: 'Trouver un adversaire' }));
+    await emit('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 
     await user.click(screen.getByRole('button', { name: 'Passer à quelqu’un d’autre' }));
 
@@ -271,42 +271,13 @@ describe('Page de chat', () => {
     });
   });
 
-  it('démarre une discussion directe depuis le paramètre d’URL', async () => {
-    await renderChatPage('/chat?user=user-2');
-
-    await waitFor(() => {
-      const started = fakeSocket.emitted.find((entry) => entry.event === 'chat:start');
-      expect(started?.payload).toEqual({ userId: 'user-2' });
-    });
-  });
-
   it('affiche le nom affiché du partenaire quand il est renseigné', async () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver quelqu’un' }));
-    await emit('match:found', {
-      matchId: 'match-1',
-      partner: { pseudonym: 'Mety-CD34', displayName: 'Miora', photoUrl: '/uploads/photos/a.png' },
-    });
+    await user.click(await screen.findByRole('button', { name: 'Trouver un adversaire' }));
+    await emit('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 
     expect(await screen.findByText('Miora')).toBeInTheDocument();
-    expect(screen.getByText('(Mety-CD34)')).toBeInTheDocument();
-  });
-
-  it('affiche l’erreur si la cible n’est pas disponible', async () => {
-    const user = userEvent.setup();
-    await renderChatPage();
-
-    await user.click(await screen.findByRole('button', { name: 'Trouver quelqu’un' }));
-
-    await emit('chat:error', {
-      code: 'USER_UNAVAILABLE',
-      message: 'Cet utilisateur n’est pas connecté actuellement.',
-    });
-
-    expect(
-      await screen.findByText('Cet utilisateur n’est pas connecté actuellement.'),
-    ).toBeInTheDocument();
   });
 });

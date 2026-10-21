@@ -11,6 +11,7 @@ export interface FormFieldProps {
   placeholder?: string;
   disabled?: boolean;
   required?: boolean;
+  maxLength?: number;
 }
 
 /**
@@ -27,6 +28,7 @@ export const FormField = ({
   placeholder,
   disabled,
   required = true,
+  maxLength,
 }: FormFieldProps) => {
   const id = useId();
   const errorId = `${id}-error`;
@@ -47,6 +49,7 @@ export const FormField = ({
         placeholder={placeholder}
         disabled={disabled}
         required={required}
+        maxLength={maxLength}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={
           [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined

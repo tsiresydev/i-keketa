@@ -6,23 +6,19 @@ import { MessageModel } from '../../models/message.model';
 import { UserModel } from '../../models/user.model';
 
 /**
- * Identité minimale d'un utilisateur connecté, transmise via `socket.data.user`.
+ * Identité minimale d'un visiteur connecté, transmise via `socket.data.user`.
  */
 export interface SocketIdentity {
   id: string;
-  pseudonym: string;
-  displayName?: string;
-  photoUrl?: string;
+  displayName: string;
 }
 
 /**
- * Profil du partenaire transmis au client lors d'une mise en relation.
- * Le nom affiché et la photo ne sont présents que s'ils ont été renseignés.
+ * Identité du partenaire transmise au client lors d'une mise en relation.
+ * Seul le nom affiché choisi par le visiteur est partagé.
  */
 export interface PartnerProfile {
-  pseudonym: string;
-  displayName?: string;
-  photoUrl?: string;
+  displayName: string;
 }
 
 export const matchRoom = (matchId: string): string => `match:${matchId}`;
@@ -40,20 +36,17 @@ export interface ActiveMatch {
   matchId: string;
   partnerId: string;
   partnerSocketId: string;
-  partnerPseudonym: string;
-  partnerDisplayName?: string;
-  partnerPhotoUrl?: string;
+  partnerDisplayName: string;
 }
 
 export const MATCH_HISTORY_LIMIT = 100;
 
 export const CHAT_ERROR_CODES = {
   UNAUTHORIZED: 'UNAUTHORIZED',
-  USER_UNAVAILABLE: 'USER_UNAVAILABLE',
 } as const;
 
 /**
- * Service de mise en relation (aléatoire et directe).
+ * Service de mise en relation aléatoire.
  *
  * La file d'attente est maintenue en mémoire sur l'instance du serveur ;
  * les sessions (Match) et les messages sont persistés dans MongoDB.
@@ -141,9 +134,7 @@ export class MatchmakingService {
       this.waiting.push({
         userId: user.id,
         socketId: socket.id,
-        pseudonym: user.pseudonym,
-        ...(user.displayName ? { displayName: user.displayName } : {}),
-        ...(user.photoUrl ? { photoUrl: user.photoUrl } : {}),
+        displayName: user.displayName,
       });
       socket.emit('queue:status', { status: 'waiting', position: this.waiting.length });
       logger.info('Utilisateur en attente de partenaire.', { userId: user.id });
@@ -162,77 +153,6 @@ export class MatchmakingService {
     if (index >= 0) {
       this.waiting.splice(index, 1);
     }
-  }
-
-  /**
-   * Démarre une discussion directe avec un utilisateur ciblé.
-   *
-   * La cible doit être connectée et libre (sans discussion en cours).
-   * Dans le cas contraire, l'erreur `USER_UNAVAILABLE` est renvoyée au demandeur.
-   */
-  async startDirectChat(socket: Socket, targetUserId: string): Promise<void> {
-    const user = socket.data.user as SocketIdentity | undefined;
-
-    if (!user) {
-      socket.emit('chat:error', {
-        code: CHAT_ERROR_CODES.UNAUTHORIZED,
-        message: 'Authentification requise.',
-      });
-      return;
-    }
-
-    if (!Types.ObjectId.isValid(targetUserId) || targetUserId === user.id) {
-      socket.emit('chat:error', {
-        code: CHAT_ERROR_CODES.USER_UNAVAILABLE,
-        message: 'Cet utilisateur ne peut pas être contacté.',
-      });
-      return;
-    }
-
-    const targetSocket = this.socketsByUser.get(targetUserId);
-
-    if (!targetSocket) {
-      socket.emit('chat:error', {
-        code: CHAT_ERROR_CODES.USER_UNAVAILABLE,
-        message: 'Cet utilisateur n’est pas connecté actuellement.',
-      });
-      return;
-    }
-
-    if (this.activeMatches.has(targetUserId)) {
-      socket.emit('chat:error', {
-        code: CHAT_ERROR_CODES.USER_UNAVAILABLE,
-        message: 'Cet utilisateur est déjà en discussion.',
-      });
-      return;
-    }
-
-    // Le demandeur quitte sa session précédente et la file d'attente.
-    if (this.activeMatches.has(user.id)) {
-      await this.endMatch(user.id, 'user_skipped');
-    }
-
-    this.leaveQueue(user.id);
-    this.leaveQueue(targetUserId);
-
-    const targetIdentity = targetSocket.data.user as SocketIdentity | undefined;
-
-    if (!targetIdentity) {
-      socket.emit('chat:error', {
-        code: CHAT_ERROR_CODES.USER_UNAVAILABLE,
-        message: 'Cet utilisateur n’est pas connecté actuellement.',
-      });
-      return;
-    }
-
-    await this.establishMatch(socket, targetSocket, {
-      userId: targetUserId,
-      pseudonym: targetIdentity.pseudonym,
-      ...(targetIdentity.displayName ? { displayName: targetIdentity.displayName } : {}),
-      ...(targetIdentity.photoUrl ? { photoUrl: targetIdentity.photoUrl } : {}),
-    });
-
-    logger.info('Discussion directe démarrée.', { requesterId: user.id, targetUserId });
   }
 
   /**
@@ -396,17 +316,13 @@ export class MatchmakingService {
       matchId,
       partnerId: partner.userId,
       partnerSocketId: partnerSocket.id,
-      partnerPseudonym: partnerProfile.pseudonym,
-      ...(partnerProfile.displayName ? { partnerDisplayName: partnerProfile.displayName } : {}),
-      ...(partnerProfile.photoUrl ? { partnerPhotoUrl: partnerProfile.photoUrl } : {}),
+      partnerDisplayName: partnerProfile.displayName,
     });
     this.activeMatches.set(partner.userId, {
       matchId,
       partnerId: joiningUser.id,
       partnerSocketId: joiningSocket.id,
-      partnerPseudonym: joiningProfile.pseudonym,
-      ...(joiningProfile.displayName ? { partnerDisplayName: joiningProfile.displayName } : {}),
-      ...(joiningProfile.photoUrl ? { partnerPhotoUrl: joiningProfile.photoUrl } : {}),
+      partnerDisplayName: joiningProfile.displayName,
     });
 
     this.leavePreviousMatchRooms(joiningSocket);
@@ -433,29 +349,25 @@ export class MatchmakingService {
   }
 
   /**
-   * Relit le profil public d'un utilisateur en base (nom affiché, photo).
-   * Les valeurs absentes sont omises : l'anonymat par défaut est préservé.
+   * Relit le nom affiché d'un visiteur en base : il est transmis au partenaire
+   * au moment de la mise en relation.
    */
   private async loadProfile(userId: string): Promise<PartnerProfile> {
     try {
-      const user = await UserModel.findById(userId).select('pseudonym displayName photoUrl');
+      const user = await UserModel.findById(userId).select('displayName');
 
       if (!user) {
-        return { pseudonym: 'Anonyme' };
+        return { displayName: 'Anonyme' };
       }
 
-      return {
-        pseudonym: user.pseudonym,
-        ...(user.displayName ? { displayName: user.displayName } : {}),
-        ...(user.photoUrl ? { photoUrl: user.photoUrl } : {}),
-      };
+      return { displayName: user.displayName };
     } catch (error) {
       logger.error('Impossible de charger le profil du partenaire.', {
         userId,
         error: error instanceof Error ? error.message : String(error),
       });
 
-      return { pseudonym: 'Anonyme' };
+      return { displayName: 'Anonyme' };
     }
   }
 

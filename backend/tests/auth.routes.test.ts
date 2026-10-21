@@ -1,150 +1,137 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
-import { registerTestUser } from './helpers/test-context';
+import { createTestSession } from './helpers/test-context';
 
 const app = createApp();
 
-describe('POST /api/auth/register', () => {
-  it('inscrit un utilisateur avec un email valide et renvoie un jeton', async () => {
-    const response = await request(app)
-      .post('/api/auth/register')
-      .send({ email: 'Rakoto@example.mg', password: 'MotDePasse1' });
+describe('POST /api/auth/session', () => {
+  it('ouvre une session anonyme à partir du seul nom affiché', async () => {
+    const response = await request(app).post('/api/auth/session').send({ displayName: 'Rakoto' });
 
     expect(response.status).toBe(201);
     expect(response.body).toMatchObject({
       token: expect.any(String),
       user: {
-        email: 'rakoto@example.mg',
-        pseudonym: expect.any(String),
+        id: expect.any(String),
+        displayName: 'Rakoto',
+        role: 'user',
       },
     });
-    expect(response.body.user.passwordHash).toBeUndefined();
   });
 
-  it('refuse un email invalide', async () => {
-    const response = await request(app)
-      .post('/api/auth/register')
-      .send({ email: 'pas-un-email', password: 'MotDePasse1' });
+  it('n’expose jamais le pseudonyme technique anonyme', async () => {
+    const response = await request(app).post('/api/auth/session').send({ displayName: 'Rakoto' });
+
+    expect(response.body.user.pseudonym).toBeUndefined();
+  });
+
+  it('ne renvoie jamais d’email ni de hash de mot de passe', async () => {
+    const response = await request(app).post('/api/auth/session').send({ displayName: 'Miora' });
+
+    expect(response.body.user.email).toBeUndefined();
+    expect(response.body.user.passwordHash).toBeUndefined();
+    expect(response.body.user.interests).toBeUndefined();
+    expect(response.body.user.photoUrl).toBeUndefined();
+  });
+
+  it('refuse un nom affiché trop court', async () => {
+    const response = await request(app).post('/api/auth/session').send({ displayName: 'A' });
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('BAD_REQUEST');
   });
 
-  it('refuse un mot de passe trop court', async () => {
+  it('refuse un nom affiché trop long', async () => {
     const response = await request(app)
-      .post('/api/auth/register')
-      .send({ email: 'court@example.mg', password: 'court' });
+      .post('/api/auth/session')
+      .send({ displayName: 'a'.repeat(41) });
 
     expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('BAD_REQUEST');
   });
 
-  it('refuse un mot de passe sans majuscule', async () => {
-    const response = await request(app)
-      .post('/api/auth/register')
-      .send({ email: 'faible@example.mg', password: 'motdepasse1' });
+  it('refuse un nom affiché absent', async () => {
+    const response = await request(app).post('/api/auth/session').send({});
 
     expect(response.status).toBe(400);
-  });
-
-  it('refuse un mot de passe sans chiffre', async () => {
-    const response = await request(app)
-      .post('/api/auth/register')
-      .send({ email: 'faible2@example.mg', password: 'MotDePasse' });
-
-    expect(response.status).toBe(400);
-  });
-
-  it('refuse un email déjà utilisé', async () => {
-    await registerTestUser(app, { email: 'doublon@example.mg' });
-
-    const response = await request(app)
-      .post('/api/auth/register')
-      .send({ email: 'doublon@example.mg', password: 'MotDePasse1' });
-
-    expect(response.status).toBe(409);
-    expect(response.body.error.code).toBe('CONFLICT');
   });
 
   it('refuse un corps qui n’est pas un objet (protection injection NoSQL)', async () => {
     const response = await request(app)
-      .post('/api/auth/register')
-      .send({ email: { $ne: null }, password: 'MotDePasse1' });
+      .post('/api/auth/session')
+      .send({ displayName: { $ne: null } });
 
     expect(response.status).toBe(400);
   });
-});
 
-describe('POST /api/auth/login', () => {
-  it('connecte un utilisateur avec des identifiants valides', async () => {
-    const registered = await registerTestUser(app, {
-      email: 'connexion@example.mg',
-      password: 'MotDePasse1',
-    });
-
+  it('refuse un champ inconnu', async () => {
     const response = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'connexion@example.mg', password: 'MotDePasse1' });
-
-    expect(response.status).toBe(200);
-    expect(response.body.token).toEqual(expect.any(String));
-    expect(response.body.user.email).toBe(registered.email);
-  });
-
-  it('refuse un mot de passe incorrect avec un message générique', async () => {
-    await registerTestUser(app, { email: 'mauvais@example.mg', password: 'MotDePasse1' });
-
-    const response = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'mauvais@example.mg', password: 'MauvaisMotDePasse2' });
-
-    expect(response.status).toBe(401);
-    expect(response.body.error.message).toBe('Identifiants invalides.');
-  });
-
-  it('renvoie le même message pour un email inconnu (anti énumération)', async () => {
-    const response = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'inconnu@example.mg', password: 'MotDePasse1' });
-
-    expect(response.status).toBe(401);
-    expect(response.body.error.message).toBe('Identifiants invalides.');
-  });
-
-  it('refuse un email invalide', async () => {
-    const response = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'pas-un-email', password: 'MotDePasse1' });
+      .post('/api/auth/session')
+      .send({ displayName: 'Rakoto', email: 'rakoto@example.mg' });
 
     expect(response.status).toBe(400);
   });
+
+  it('crée une session distincte à chaque visite', async () => {
+    const first = await createTestSession(app, { displayName: 'Rakoto' });
+    const second = await createTestSession(app, { displayName: 'Rakoto' });
+
+    expect(first.userId).not.toBe(second.userId);
+    expect(first.token).not.toBe(second.token);
+  });
 });
 
-describe('GET /api/users/me', () => {
-  it('renvoie le profil de l’utilisateur authentifié', async () => {
-    const user = await registerTestUser(app);
+describe('GET /api/auth/session', () => {
+  it('renvoie la session courante', async () => {
+    const session = await createTestSession(app, { displayName: 'Rakoto' });
 
     const response = await request(app)
-      .get('/api/users/me')
-      .set('Authorization', `Bearer ${user.token}`);
+      .get('/api/auth/session')
+      .set('Authorization', `Bearer ${session.token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body.user.email).toBe(user.email);
+    expect(response.body.user.displayName).toBe('Rakoto');
+    expect(response.body.user.id).toBe(session.userId);
     expect(response.body.user.passwordHash).toBeUndefined();
   });
 
   it('refuse un accès sans jeton', async () => {
-    const response = await request(app).get('/api/users/me');
+    const response = await request(app).get('/api/auth/session');
 
     expect(response.status).toBe(401);
   });
 
   it('refuse un jeton invalide', async () => {
     const response = await request(app)
-      .get('/api/users/me')
+      .get('/api/auth/session')
       .set('Authorization', 'Bearer jeton-invalide');
 
     expect(response.status).toBe(401);
+  });
+});
+
+describe('Routes retirées', () => {
+  it('ne renvoie plus l’API d’inscription', async () => {
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'rakoto@example.mg', password: 'MotDePasse1' });
+
+    expect(response.status).toBe(404);
+  });
+
+  it('ne renvoie plus l’API de connexion', async () => {
+    const response = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'rakoto@example.mg', password: 'MotDePasse1' });
+
+    expect(response.status).toBe(404);
+  });
+
+  it('ne renvoie plus l’annuaire des utilisateurs', async () => {
+    const response = await request(app).get('/api/users');
+
+    expect(response.status).toBe(404);
   });
 });
 

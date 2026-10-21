@@ -1,11 +1,11 @@
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CallSessionModel } from '../src/models/call-session.model';
-import { createTestContext, registerTestUser, type TestContext } from './helpers/test-context';
+import { createTestContext, createTestSession, type TestContext } from './helpers/test-context';
 
 interface MatchFoundEvent {
   matchId: string;
-  partner: { pseudonym: string };
+  partner: { displayName: string };
 }
 
 const waitForEvent = <T>(socket: ClientSocket, event: string, timeoutMs = 10_000): Promise<T> =>
@@ -106,8 +106,8 @@ describe('Temps réel — signalisation des appels audiovisuels', () => {
     bobSocket: ClientSocket;
     matchId: string;
   }> => {
-    const alice = await registerTestUser(context.app);
-    const bob = await registerTestUser(context.app);
+    const alice = await createTestSession(context.app);
+    const bob = await createTestSession(context.app);
 
     const aliceSocket = await connect(alice.token);
     const bobSocket = await connect(bob.token);
@@ -183,7 +183,7 @@ describe('Temps réel — signalisation des appels audiovisuels', () => {
   });
 
   it('refuse un appel sans session de chat active', async () => {
-    const alice = await registerTestUser(context.app);
+    const alice = await createTestSession(context.app);
     const aliceSocket = await connect(alice.token);
 
     const error = waitForEvent<{ code: string }>(aliceSocket, 'chat:error');

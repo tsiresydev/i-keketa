@@ -1,38 +1,22 @@
 import { z } from 'zod';
 import { env } from '../config/env';
-import { optionalProfileFieldsSchema } from './user.schema';
 
 /**
  * Schémas de validation des entrées (côté serveur — source de vérité).
  * Les schémas zod rejettent les objets non textuels, ce qui protège
  * contre les injections NoSQL (opérateurs mongo injectés dans le corps JSON).
  */
-const emailSchema = z
+export const displayNameSchema = z
   .string()
   .trim()
-  .min(1, 'L’adresse email est requise.')
-  .max(254, 'L’adresse email est trop longue.')
-  .email('L’adresse email doit être valide.')
-  .transform((value) => value.toLowerCase());
+  .min(2, 'Le nom affiché doit contenir au moins 2 caractères.')
+  .max(40, 'Le nom affiché ne peut pas dépasser 40 caractères.');
 
-const passwordSchema = z
-  .string()
-  .min(8, 'Le mot de passe doit contenir au moins 8 caractères.')
-  .max(128, 'Le mot de passe est trop long.')
-  .regex(/[a-z]/, 'Le mot de passe doit contenir au moins une lettre minuscule.')
-  .regex(/[A-Z]/, 'Le mot de passe doit contenir au moins une lettre majuscule.')
-  .regex(/[0-9]/, 'Le mot de passe doit contenir au moins un chiffre.');
-
-export const registerSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
-  ...optionalProfileFieldsSchema,
-});
-
-export const loginSchema = z.object({
-  email: emailSchema,
-  password: z.string().min(1, 'Le mot de passe est requis.').max(128),
-});
+export const sessionSchema = z
+  .object({
+    displayName: displayNameSchema,
+  })
+  .strict();
 
 export const messageContentSchema = z
   .object({
@@ -50,6 +34,5 @@ export const matchIdParamSchema = z.object({
   matchId: z.string().trim().min(1).max(64),
 });
 
-export type RegisterInput = z.infer<typeof registerSchema>;
-export type LoginInput = z.infer<typeof loginSchema>;
+export type SessionInput = z.infer<typeof sessionSchema>;
 export type MessageInput = z.infer<typeof messageContentSchema>;

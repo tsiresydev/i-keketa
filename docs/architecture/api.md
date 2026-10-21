@@ -22,40 +22,27 @@ Préfixe des routes REST : `/api`. Format d'erreur unique :
 | Méthode | Route | Auth | Description | Succès |
 |---------|-------|------|-------------|--------|
 | GET | /health | — | État du service | 200 `{ "status": "ok", "uptime": 12 }` |
-| POST | /api/auth/register | — | Inscription (email + mot de passe, profil facultatif) | 201 `{ token, user }` |
-| POST | /api/auth/login | — | Connexion (email + mot de passe) | 200 `{ token, user }` |
-| GET | /api/users/me | Bearer | Profil de l'utilisateur courant | 200 `{ user }` |
-| PUT | /api/users/me | Bearer | Mise à jour du profil (nom, intérêts, localisation) | 200 `{ user }` |
-| POST | /api/users/me/photo | Bearer | Envoi d'une photo de profil (`multipart/form-data`, champ `photo`) | 200 `{ user }` |
-| DELETE | /api/users/me/photo | Bearer | Suppression de la photo de profil | 200 `{ user }` |
-| GET | /api/users | Bearer | Annuaire des utilisateurs (filtres + pagination) | 200 `{ users, total, page, limit, totalPages }` |
+| POST | /api/auth/session | — | Ouvre une session anonyme à partir du seul nom affiché | 201 `{ token, user }` |
+| GET | /api/auth/session | Bearer | Session courante | 200 `{ user }` |
 | GET | /api/chat/matches/:matchId/messages | Bearer | Historique d'une session de chat | 200 `{ matchId, messages }` |
 | POST | /api/reports | Bearer | Signalement d'abus du partenaire de la session | 201 `{ report }` |
 | GET | /api/reports/me | Bearer | Signalements émis par l'utilisateur courant | 200 `{ reports }` |
-| GET | /uploads/photos/:fichier | — | Photo de profil servie en statique | 200 (image) |
 
 ### Objets renvoyés
 
-`user` (privé — propriétaire de la ressource) :
+`user` (session courante) :
 
 ```json
 {
   "id": "652f1a...",
-  "email": "rakoto@example.mg",
-  "pseudonym": "Tsara-4KPQ",
-  "role": "user",
   "displayName": "Miora",
-  "interests": ["musique"],
-  "photoUrl": "/uploads/photos/652f1a-....png",
-  "location": "Antananarivo",
+  "role": "user",
   "createdAt": "2026-10-20T10:00:00.000Z"
 }
 ```
 
-`user` (public — annuaire et partenaire) : mêmes champs **sans `email`**.
-
-Le partenaire ne reçoit jamais l'email : il ne voit que le `pseudonym` anonyme. `displayName` et
-`photoUrl` n'apparaissent que si l'utilisateur les a explicitement renseignés (anonymat par défaut).
+Le pseudonyme technique anonyme (`pseudonym`) n'est **jamais** exposé : il reste interne au serveur
+(journalisation, signalements). Le partenaire ne voit que le `displayName` choisi par le visiteur.
 
 `message` :
 
@@ -78,63 +65,41 @@ Le partenaire ne reçoit jamais l'email : il ne voit que le `pseudonym` anonyme.
   "reason": "harassment",
   "details": "Insistances déplacées.",
   "status": "pending",
-  "reportedPseudonym": "Mety-CD34",
+  "reportedDisplayName": "Mety-CD34",
   "createdAt": "2026-10-20T10:05:00.000Z"
 }
 ```
 
-### Mise à jour du profil — `PUT /api/users/me`
+### Ouverture de session — `POST /api/auth/session`
 
-Corps JSON (champs facultatifs, seuls ceux fournis sont modifiés) :
+Corps JSON :
 
 ```json
 {
-  "displayName": "Miora",
-  "interests": ["musique", "voyage"],
-  "location": "Antananarivo"
+  "displayName": "Miora"
 }
 ```
 
 | Champ | Règles |
 |-------|--------|
-| `displayName` | 2 à 60 caractères, chaîne uniquement |
-| `interests` | 10 éléments maximum, 30 caractères par élément, dédupliqués sans tenir compte de la casse |
-| `location` | 2 à 120 caractères |
+| `displayName` | 2 à 40 caractères, chaîne uniquement (obligatoire) |
 
-Le corps est `strict` : un champ inconnu est refusé (`400`).
+Le corps est `strict` : un champ inconnu est refusé (`400`), et la protection contre l'injection
+NoSQL s'applique (opérateurs mongo injectés refusés).
 
-### Photo de profil — `POST /api/users/me/photo`
-
-- `multipart/form-data`, un seul fichier dans le champ `photo`.
-- Types acceptés : `image/jpeg`, `image/png`, `image/webp`.
-- Taille maximale : 2 Mo (`PHOTO_MAX_SIZE_BYTES`).
-- Le type MIME **et** la signature binaire du fichier (magic bytes) sont vérifiés : un fichier
-  renommé est refusé (`400`).
-- La photo précédente est supprimée du stockage lors d'un remplacement.
-- Stockage local : `backend/uploads/photos/`, servi sur `/uploads` (hors périmètre de l'API `/api`).
-- `DELETE /api/users/me/photo` supprime la photo et le fichier associé.
-
-### Annuaire — `GET /api/users`
-
-| Paramètre | Type | Règles |
-|-----------|------|--------|
-| `q` | chaîne | ≤ 60 caractères, recherche sur `displayName` et `pseudonym` (insensible à la casse) |
-| `interests` | chaîne | Liste séparée par des virgules (10 maximum) ; un utilisateur correspond s'il partage au moins un intérêt |
-| `location` | chaîne | ≤ 120 caractères, correspondance partielle (insensible à la casse) |
-| `page` | entier | ≥ 1, défaut `1` |
-| `limit` | entier | 1 à 50, défaut `20` |
-
-L'utilisateur connecté n'apparaît jamais dans sa propre liste.
+Réponse `201` :
 
 ```json
 {
-  "users": [{ "id": "652f1a...", "pseudonym": "Tsara-4KPQ", "displayName": "Miora", "interests": [], "createdAt": "2026-10-20T10:00:00.000Z" }],
-  "total": 1,
-  "page": 1,
-  "limit": 20,
-  "totalPages": 1
+  "token": "<jwt>",
+  "user": { "id": "652f1a...", "displayName": "Miora", "role": "user", "createdAt": "2026-10-20T10:00:00.000Z" }
 }
 ```
+
+### Session courante — `GET /api/auth/session`
+
+Retourne la session associée au jeton Bearer (`200 { user }`), ou `401` si le jeton est absent,
+invalide ou expiré.
 
 ### Signalement d'abus — `POST /api/reports`
 
@@ -167,28 +132,27 @@ Règles :
   `REPORT_RATE_LIMIT_WINDOW_MS` (`429`).
 
 ### Règles de validation
-- `email` : format email valide, normalisé en minuscules, 254 caractères maximum.
-- `password` (inscription) : 8 à 128 caractères, au moins une minuscule, une majuscule et un chiffre.
-- `password` (connexion) : non vide (la force n'est pas re-vérifiée à la connexion).
+- `displayName` (session) : 2 à 40 caractères, chaîne uniquement.
 - `matchId` : identifiant MongoDB de la session de chat.
-- Corps JSON limité à 32 Ko ; les champs inconnus sont refusés sur les messages.
+- Corps JSON limité à 32 Ko ; les champs inconnus sont refusés sur les messages et sur
+  `/api/auth/session`.
 
 ### Codes HTTP et erreurs
 
 | Code | Signification | Cas |
 |------|---------------|-----|
-| 200 | Succès | Connexion, profil, historique |
-| 201 | Ressource créée | Inscription |
+| 200 | Succès | Session courante, historique, signalements |
+| 201 | Ressource créée | Ouverture de session, signalement |
 | 400 | Requête invalide | Validation Zod, corps malformé |
-| 401 | Non authentifié | Jeton absent, invalide ou expiré, identifiants erronés |
+| 401 | Non authentifié | Jeton absent, invalide ou expiré |
 | 403 | Interdit | Accès à l'historique d'une session dont on ne fait pas partie |
 | 404 | Introuvable | Route inconnue, session de chat inexistante, session non signalable |
-| 409 | Conflit | Email déjà utilisé, signalement déjà envoyé pour cette session |
+| 409 | Conflit | Signalement déjà envoyé pour cette session |
 | 429 | Trop de requêtes | Limitation de débit |
 | 500 | Erreur interne | Détails journalisés côté serveur uniquement |
 
-La connexion renvoie toujours le même message (`Identifiants invalides.`) que l'email existe ou non
-(anti énumération de comptes). L'inscription renvoie explicitement `409` en cas de doublon.
+La limitation de débit s'applique à l'ouverture de session (`authLimiter`) et aux signalements
+(`reportLimiter`).
 
 ## WebSocket (Socket.IO)
 
@@ -208,7 +172,6 @@ Une connexion sans jeton valide est rejetée (`connect_error`).
 | `queue:join` | — | Rejoint la file d'attente de mise en relation |
 | `queue:leave` | — | Quitte la file d'attente |
 | `chat:skip` | — | Termine la session en cours et rejoint la file d'attente |
-| `chat:start` | `{ userId }` | Démarre une discussion directe avec l'utilisateur ciblé |
 | `chat:message` | `{ matchId, content }` | Envoie un message texte |
 | `media:request` | `{ matchId, audio, video }` | Demande un appel audiovisuel au partenaire |
 | `media:accept` | `{ matchId }` | Accepte l'appel entrant |
@@ -223,11 +186,11 @@ Une connexion sans jeton valide est rejetée (`connect_error`).
 | Événement | Payload | Description |
 |-----------|---------|-------------|
 | `queue:status` | `{ status: 'idle' \| 'waiting', position? }` | État de la file d'attente |
-| `match:found` | `{ matchId, partner: { pseudonym, displayName?, photoUrl? } }` | Mise en relation effectuée (aléatoire ou directe) |
+| `match:found` | `{ matchId, partner: { displayName } }` | Mise en relation effectuée (aléatoire uniquement) |
 | `match:ended` | `{ matchId, reason }` | Fin de session (`user_skipped`, `partner_disconnected`, `user_disconnected`) |
 | `chat:history` | `{ matchId, messages }` | Historique de la session (100 derniers messages) |
 | `chat:message` | `{ message }` | Message reçu (émis par l'expéditeur ou le partenaire) |
-| `chat:error` | `{ code, message }` | Erreur applicative (`INVALID_MESSAGE`, `NO_ACTIVE_MATCH`, `RATE_LIMITED`, `MESSAGE_FAILED`, `UNAUTHORIZED`, `USER_UNAVAILABLE`, `INVALID_TARGET`, `INVALID_PAYLOAD`, `CALL_ALREADY_ACTIVE`, `CALL_NOT_FOUND`) |
+| `chat:error` | `{ code, message }` | Erreur applicative (`INVALID_MESSAGE`, `NO_ACTIVE_MATCH`, `RATE_LIMITED`, `MESSAGE_FAILED`, `UNAUTHORIZED`, `INVALID_PAYLOAD`, `CALL_ALREADY_ACTIVE`, `CALL_NOT_FOUND`) |
 | `media:request` | `{ matchId, audio, video }` | Demande d'appel reçue |
 | `media:accepted` | `{ matchId }` | L'appel a été accepté |
 | `media:offer` | `{ matchId, description }` | Offre SDP reçue |
@@ -267,7 +230,7 @@ Déroulé d'un appel :
 Lancement automatique :
 
 - Dès la mise en relation (`match:found`), le client frontend demande l'accès à la caméra et au
-  micro puis émet `media:request` sans action de l'utilisateur ; le bouton « Appeler » reste
+  micro puis émet `media:request` sans action de l'utilisateur ; le bouton « Lancer le match » reste
   disponible pour relancer un appel arrêté.
 - L'appel entrant est accepté automatiquement (`media:accept`) : la demande concurrente émise par
   le partenaire est alors rejetée par le serveur (`CALL_ALREADY_ACTIVE`) et cette erreur est
@@ -293,24 +256,10 @@ Règles :
 
 ### Discussion directe — `chat:start`
 
-Le demandeur émet `chat:start` avec l'identifiant de l'utilisateur ciblé :
-
-```js
-socket.emit('chat:start', { userId: '652f1a...' });
-```
-
-Règles :
-
-- La cible doit être **connectée** (une session Socket.IO active) : sinon `chat:error`
-  avec le code `USER_UNAVAILABLE`.
-- La cible ne doit pas être déjà en discussion : sinon `chat:error` avec le code `USER_UNAVAILABLE`.
-- Le demandeur ne peut pas cibler son propre compte (`USER_UNAVAILABLE`).
-- En cas de succès, les deux participants reçoivent `match:found` avec le même `matchId`, puis
-  l'historique de la session via `chat:history` — exactement comme une mise en relation aléatoire.
-- Le demandeur quitte sa session précédente et la file d'attente avant la nouvelle session.
+Supprimée dans la refonte : aucune discussion directe ciblée n'est proposée. La mise en relation se
+fait uniquement via la file d'attente aléatoire (`queue:join`). Le serveur ignore l'événement
+`chat:start` s'il est émis.
 
 ## Pagination / filtrage / tri
 
 - L'historique est limité aux 100 derniers messages d'une session.
-- L'annuaire des utilisateurs est paginé (`page`, `limit` ≤ 50) et filtrable par intérêts,
-  localisation ou recherche textuelle (voir `GET /api/users`).

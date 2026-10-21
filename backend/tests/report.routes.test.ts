@@ -5,7 +5,7 @@ import { createApp } from '../src/app';
 import { MatchModel } from '../src/models/match.model';
 import { ReportModel } from '../src/models/report.model';
 import { rateLimits } from '../src/middleware/rate-limiters';
-import { registerTestUser } from './helpers/test-context';
+import { createTestSession } from './helpers/test-context';
 
 const app = createApp();
 
@@ -33,8 +33,8 @@ const createMatch = async (aliceId: string, bobId: string): Promise<string> => {
 
 describe('POST /api/reports', () => {
   it('enregistre un signalement avec le partenaire comme utilisateur signalé', async () => {
-    const alice = await registerTestUser(app);
-    const bob = await registerTestUser(app);
+    const alice = await createTestSession(app, { displayName: 'Miora' });
+    const bob = await createTestSession(app, { displayName: 'Rakoto' });
     const matchId = await createMatch(alice.userId, bob.userId);
 
     const response = await request(app)
@@ -46,7 +46,8 @@ describe('POST /api/reports', () => {
     expect(response.body.report.status).toBe('pending');
     expect(response.body.report.reason).toBe('harassment');
     expect(response.body.report.matchId).toBe(matchId);
-    expect(response.body.report.reportedPseudonym).toBe(bob.pseudonym);
+    expect(response.body.report.reportedDisplayName).toBe('Rakoto');
+    expect(response.body.report.reportedPseudonym).toBeUndefined();
 
     const stored = await ReportModel.findOne({ matchId });
     expect(stored?.reporterId.toString()).toBe(alice.userId);
@@ -55,8 +56,8 @@ describe('POST /api/reports', () => {
   });
 
   it('refuse un second signalement pour la même session', async () => {
-    const alice = await registerTestUser(app);
-    const bob = await registerTestUser(app);
+    const alice = await createTestSession(app);
+    const bob = await createTestSession(app);
     const matchId = await createMatch(alice.userId, bob.userId);
 
     const first = await request(app)
@@ -76,8 +77,8 @@ describe('POST /api/reports', () => {
   });
 
   it('autorise chaque participant à signaler la session', async () => {
-    const alice = await registerTestUser(app);
-    const bob = await registerTestUser(app);
+    const alice = await createTestSession(app);
+    const bob = await createTestSession(app);
     const matchId = await createMatch(alice.userId, bob.userId);
 
     const fromAlice = await request(app)
@@ -96,7 +97,7 @@ describe('POST /api/reports', () => {
   });
 
   it('refuse un signalement depuis une session inconnue', async () => {
-    const alice = await registerTestUser(app);
+    const alice = await createTestSession(app);
 
     const response = await request(app)
       .post('/api/reports')
@@ -107,8 +108,8 @@ describe('POST /api/reports', () => {
   });
 
   it('refuse un signalement depuis une session clôturée', async () => {
-    const alice = await registerTestUser(app);
-    const bob = await registerTestUser(app);
+    const alice = await createTestSession(app);
+    const bob = await createTestSession(app);
 
     const match = await MatchModel.create({
       participants: [new Types.ObjectId(alice.userId), new Types.ObjectId(bob.userId)],
@@ -124,9 +125,9 @@ describe('POST /api/reports', () => {
   });
 
   it('refuse un signalement par un tiers', async () => {
-    const alice = await registerTestUser(app);
-    const bob = await registerTestUser(app);
-    const mallory = await registerTestUser(app);
+    const alice = await createTestSession(app);
+    const bob = await createTestSession(app);
+    const mallory = await createTestSession(app);
     const matchId = await createMatch(alice.userId, bob.userId);
 
     const response = await request(app)
@@ -139,8 +140,8 @@ describe('POST /api/reports', () => {
   });
 
   it('refuse un motif invalide', async () => {
-    const alice = await registerTestUser(app);
-    const bob = await registerTestUser(app);
+    const alice = await createTestSession(app);
+    const bob = await createTestSession(app);
     const matchId = await createMatch(alice.userId, bob.userId);
 
     const response = await request(app)
@@ -162,9 +163,9 @@ describe('POST /api/reports', () => {
 
 describe('GET /api/reports/me', () => {
   it('ne renvoie que les signalements de l’utilisateur courant', async () => {
-    const alice = await registerTestUser(app);
-    const bob = await registerTestUser(app);
-    const charlie = await registerTestUser(app);
+    const alice = await createTestSession(app);
+    const bob = await createTestSession(app);
+    const charlie = await createTestSession(app);
 
     const aliceMatch = await createMatch(alice.userId, bob.userId);
     const charlieMatch = await createMatch(charlie.userId, bob.userId);

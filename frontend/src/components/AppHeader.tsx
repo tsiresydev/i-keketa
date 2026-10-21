@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/use-auth';
+import { Link, useNavigate } from 'react-router-dom';
+import { useSession } from '../hooks/use-session';
 import type { ConnectionStatus } from '../types';
 
 export interface AppHeaderProps {
@@ -10,20 +10,21 @@ export interface AppHeaderProps {
 }
 
 /**
- * En-tête commun : navigation, identité de l'utilisateur et déconnexion.
+ * En-tête commun : identité de l'utilisateur et déconnexion.
+ * La navigation a été simplifiée : une seule page de discussion.
  */
 export const AppHeader = ({ children, connectionStatus }: AppHeaderProps) => {
-  const { user, logout } = useAuth();
+  const { user, logout } = useSession();
   const navigate = useNavigate();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const displayName = user?.displayName ?? user?.pseudonym ?? 'Invité';
+  const displayName = user?.displayName ?? 'Invité';
 
   const handleLogout = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     setIsLoggingOut(true);
     logout();
-    navigate('/connexion', { replace: true });
+    navigate('/', { replace: true });
   };
 
   return (
@@ -32,37 +33,12 @@ export const AppHeader = ({ children, connectionStatus }: AppHeaderProps) => {
         💬 I-Keketa
       </Link>
 
-      <nav className="app-header__nav" aria-label="Navigation principale">
-        <NavLink
-          to="/chat"
-          className={({ isActive }) => `app-header__link${isActive ? ' is-active' : ''}`}
-        >
-          Discussion
-        </NavLink>
-        <NavLink
-          to="/decouvrir"
-          className={({ isActive }) => `app-header__link${isActive ? ' is-active' : ''}`}
-        >
-          Découvrir
-        </NavLink>
-        <NavLink
-          to="/profil"
-          className={({ isActive }) => `app-header__link${isActive ? ' is-active' : ''}`}
-        >
-          Mon profil
-        </NavLink>
-      </nav>
-
       {children}
 
       <div className="app-header__identity">
-        {user?.photoUrl ? (
-          <img className="avatar avatar--sm" src={user.photoUrl} alt="" aria-hidden="true" />
-        ) : (
-          <span className="avatar avatar--sm avatar--placeholder" aria-hidden="true">
-            {displayName.slice(0, 1).toUpperCase()}
-          </span>
-        )}
+        <span className="avatar avatar--sm avatar--placeholder" aria-hidden="true">
+          {displayName.slice(0, 1).toUpperCase()}
+        </span>
 
         <span className="app-header__identity-text">
           <strong>{displayName}</strong>

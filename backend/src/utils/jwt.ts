@@ -4,7 +4,6 @@ import { ApiError } from './api-error';
 
 export interface TokenPayload {
   sub: string;
-  email: string;
 }
 
 export const signAccessToken = (payload: TokenPayload): string => {
@@ -13,7 +12,7 @@ export const signAccessToken = (payload: TokenPayload): string => {
     subject: payload.sub,
   };
 
-  return jwt.sign({ email: payload.email }, env.JWT_SECRET, options);
+  return jwt.sign({}, env.JWT_SECRET, options);
 };
 
 export const verifyAccessToken = (token: string): TokenPayload => {
@@ -21,17 +20,15 @@ export const verifyAccessToken = (token: string): TokenPayload => {
     const decoded = jwt.verify(token, env.JWT_SECRET);
 
     if (typeof decoded === 'string' || typeof decoded.sub !== 'string') {
-      throw ApiError.unauthorized('Jeton d’authentification invalide.');
+      throw ApiError.unauthorized('Jeton de session invalide.');
     }
 
-    const email = typeof decoded.email === 'string' ? decoded.email : '';
-
-    return { sub: decoded.sub, email };
+    return { sub: decoded.sub };
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;
     }
 
-    throw ApiError.unauthorized('Jeton d’authentification invalide ou expiré.');
+    throw ApiError.unauthorized('Jeton de session invalide ou expiré.');
   }
 };

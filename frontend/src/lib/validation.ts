@@ -75,69 +75,27 @@ export const validateMessage = (content: string): string | undefined => {
   return undefined;
 };
 
-/* ---------- Profil (Sprint 2) ---------- */
+export const DISPLAY_NAME_MAX_LENGTH = 40;
 
-export const DISPLAY_NAME_MAX_LENGTH = 60;
-export const INTEREST_MAX_LENGTH = 30;
-export const INTEREST_MAX_COUNT = 10;
-export const LOCATION_MAX_LENGTH = 120;
+/* ---------- Session anonyme (Sprint 4) ---------- */
 
 /**
- * Découpe une saisie d'intérêts séparés par des virgules.
+ * Validates the display name for anonymous session creation.
+ * Rules aligned with backend/src/schemas/auth.schema.ts (displayNameSchema).
  */
-export const parseInterests = (value: string): string[] =>
-  value
-    .split(',')
-    .map((interest) => interest.trim())
-    .filter((interest) => interest.length > 0);
-
-export const validateDisplayName = (value: string): string | undefined => {
+export const validateSessionDisplayName = (value: string): string | undefined => {
   const trimmed = value.trim();
 
   if (trimmed.length === 0) {
-    return undefined;
+    return 'Le nom affiché est requis.';
   }
 
   if (trimmed.length < 2) {
-    return 'Le nom doit contenir au moins 2 caractères.';
+    return 'Le nom affiché doit contenir au moins 2 caractères.';
   }
 
   if (trimmed.length > DISPLAY_NAME_MAX_LENGTH) {
-    return `Le nom ne peut pas dépasser ${DISPLAY_NAME_MAX_LENGTH} caractères.`;
-  }
-
-  return undefined;
-};
-
-export const validateInterests = (value: string): string | undefined => {
-  const interests = parseInterests(value);
-
-  if (interests.length > INTEREST_MAX_COUNT) {
-    return `Maximum ${INTEREST_MAX_COUNT} centres d’intérêt.`;
-  }
-
-  const tooLong = interests.find((interest) => interest.length > INTEREST_MAX_LENGTH);
-
-  if (tooLong) {
-    return `Un centre d’intérêt ne peut pas dépasser ${INTEREST_MAX_LENGTH} caractères.`;
-  }
-
-  return undefined;
-};
-
-export const validateLocation = (value: string): string | undefined => {
-  const trimmed = value.trim();
-
-  if (trimmed.length === 0) {
-    return undefined;
-  }
-
-  if (trimmed.length < 2) {
-    return 'La localisation doit contenir au moins 2 caractères.';
-  }
-
-  if (trimmed.length > LOCATION_MAX_LENGTH) {
-    return `La localisation ne peut pas dépasser ${LOCATION_MAX_LENGTH} caractères.`;
+    return `Le nom affiché ne peut pas dépasser ${DISPLAY_NAME_MAX_LENGTH} caractères.`;
   }
 
   return undefined;

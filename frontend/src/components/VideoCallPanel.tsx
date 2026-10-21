@@ -43,10 +43,10 @@ export const VideoCallPanel = ({
       <section
         className="call-panel call-panel--incoming"
         role="alertdialog"
-        aria-label="Appel entrant"
+        aria-label="Match entrant"
       >
-        <p className="call-panel__title">📹 Appel entrant</p>
-        <p className="call-panel__text">{partnerName} vous appelle.</p>
+        <p className="call-panel__title">📹 Match entrant</p>
+        <p className="call-panel__text">{partnerName} vous propose un match.</p>
         <div className="call-panel__actions">
           <button type="button" className="button" onClick={onAccept}>
             Accepter
@@ -63,11 +63,11 @@ export const VideoCallPanel = ({
     return (
       <section className="call-panel" aria-live="polite">
         <div className="spinner" aria-hidden="true" />
-        <p className="call-panel__title">Appel en cours…</p>
+        <p className="call-panel__title">Match en cours…</p>
         <p className="call-panel__text">En attente de la réponse de {partnerName}.</p>
         <div className="call-panel__actions">
           <button type="button" className="button button--secondary" onClick={onEnd}>
-            Annuler l’appel
+            Annuler le match
           </button>
         </div>
       </section>
@@ -78,13 +78,13 @@ export const VideoCallPanel = ({
     return (
       <section className="call-panel" aria-live="polite">
         <div className="spinner" aria-hidden="true" />
-        <p className="call-panel__title">Connexion à l’appel…</p>
+        <p className="call-panel__title">Coup d’envoi…</p>
       </section>
     );
   }
 
   return (
-    <section className="call-panel call-panel--live" aria-label="Appel en cours">
+    <section className="call-panel call-panel--live" aria-label="Match en cours">
       <div className="call-stage">
         {remoteStream ? (
           <VideoStream

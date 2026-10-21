@@ -1,9 +1,9 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+﻿import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Socket } from 'socket.io-client';
-import { AuthProvider } from '../src/context/auth-provider';
+import { SessionProvider } from '../src/context/session-provider';
 import { ChatPage } from '../src/pages/ChatPage';
 
 interface EmittedEvent {
@@ -70,7 +70,7 @@ const { fakeSocket, getUserMediaMock, reportsCreateMock } = vi.hoisted(() => {
       matchId: 'match-1',
       reason: 'harassment',
       status: 'pending',
-      reportedPseudonym: 'Mety-CD34',
+      reportedDisplayName: 'Miora',
       createdAt: '2026-01-01T00:00:00.000Z',
     },
   }));
@@ -92,10 +92,8 @@ vi.mock('../src/lib/api-client', async (importOriginal) => {
       me: vi.fn().mockResolvedValue({
         user: {
           id: 'user-1',
-          email: 'rakoto@example.mg',
-          pseudonym: 'Tsara-AB12',
+          displayName: 'Rakoto',
           role: 'user',
-          interests: [],
           createdAt: '2026-01-01T00:00:00.000Z',
         },
       }),
@@ -125,9 +123,9 @@ const flushPendingTasks = async (): Promise<void> => {
 const renderChatPage = async () => {
   const view = render(
     <MemoryRouter initialEntries={['/chat']}>
-      <AuthProvider>
+      <SessionProvider>
         <ChatPage />
-      </AuthProvider>
+      </SessionProvider>
     </MemoryRouter>,
   );
 
@@ -142,13 +140,15 @@ const renderChatPage = async () => {
   return view;
 };
 
-/** Amène la page de chat en session avec un partenaire. */
+/**
+ * Amène la page de chat en session avec un partenaire.
+ */
 const enterSession = async (): Promise<void> => {
   const user = userEvent.setup();
   await renderChatPage();
 
-  await user.click(await screen.findByRole('button', { name: 'Trouver quelqu’un' }));
-  await deliver('match:found', { matchId: 'match-1', partner: { pseudonym: 'Mety-CD34' } });
+  await user.click(await screen.findByRole('button', { name: 'Trouver un adversaire' }));
+  await deliver('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 };
 
 /**
@@ -229,7 +229,7 @@ describe('Appel audiovisuel', () => {
     reportsCreateMock.mockClear();
     FakePeerConnection.instances.length = 0;
     FakePeerConnection.autoTrackOnRemoteDescription = false;
-    window.localStorage.setItem('i-keketa.auth.token', 'jeton-de-test');
+    window.localStorage.setItem('i-keketa.session.token', 'jeton-de-test');
 
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
@@ -239,13 +239,13 @@ describe('Appel audiovisuel', () => {
     vi.stubGlobal('RTCPeerConnection', FakePeerConnection);
   });
 
-  it('propose d’appeler une fois la session établie', async () => {
+  it('propose de lancer un match une fois la session établie', async () => {
     await enterSession();
 
-    expect(await screen.findByRole('button', { name: '📹 Appeler' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '📹 Lancer le match' })).toBeInTheDocument();
   });
 
-  it('lance l’appel vidéo automatiquement dès qu’un partenaire est trouvé', async () => {
+  it('lance automatiquement l’appel vidéo dès qu’un partenaire est trouvé', async () => {
     await enterSession();
 
     await waitFor(() => {
@@ -257,9 +257,9 @@ describe('Appel audiovisuel', () => {
       expect(request?.payload).toEqual({ matchId: 'match-1', audio: true, video: true });
     });
 
-    expect(await screen.findByText('Appel en cours…')).toBeInTheDocument();
+    expect(await screen.findByText('Match en cours…')).toBeInTheDocument();
     expect(
-      await screen.findByText(/Appel vidéo automatique : autorisez l’accès à la caméra/),
+      await screen.findByText(/Match vidéo automatique : autorisez l’accès à la caméra/),
     ).toBeInTheDocument();
   });
 
@@ -273,10 +273,10 @@ describe('Appel audiovisuel', () => {
       expect(accept?.payload).toEqual({ matchId: 'match-1' });
     });
 
-    expect(await screen.findByText('Connexion à l’appel…')).toBeInTheDocument();
+    expect(await screen.findByText('Coup d’envoi…')).toBeInTheDocument();
   });
 
-  it('permet de relancer l’appel manuellement après un raccrochage', async () => {
+  it('permet de relancer le match manuellement après un raccrochage', async () => {
     const user = userEvent.setup();
     await enterSession();
 
@@ -288,7 +288,7 @@ describe('Appel audiovisuel', () => {
 
     fakeSocket.emitted.length = 0;
 
-    await user.click(await screen.findByRole('button', { name: '📹 Appeler' }));
+    await user.click(await screen.findByRole('button', { name: '📹 Lancer le match' }));
 
     await waitFor(() => {
       const request = fakeSocket.emitted.find((entry) => entry.event === 'media:request');
@@ -296,7 +296,7 @@ describe('Appel audiovisuel', () => {
     });
   });
 
-  it('n’émet qu’une seule demande d’appel lorsqu’un appel entrant arrive', async () => {
+  it('n’émet qu’une seule demande quand un appel entrant arrive', async () => {
     await enterSession();
 
     await deliver('media:request', { matchId: 'match-1', audio: true, video: true });
@@ -344,7 +344,7 @@ describe('Appel audiovisuel', () => {
 
     await deliver('media:request', { matchId: 'autre-session', audio: true, video: true });
 
-    expect(screen.queryByText(/Appel entrant/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Match entrant/)).not.toBeInTheDocument();
     expect(fakeSocket.emitted.some((entry) => entry.event === 'media:accept')).toBe(false);
   });
 
@@ -368,7 +368,7 @@ describe('Appel audiovisuel', () => {
 
     await deliver('media:ended', { matchId: 'match-1', reason: 'hangup' });
 
-    expect(await screen.findByText('Votre partenaire a raccroché.')).toBeInTheDocument();
+    expect(await screen.findByText('Votre partenaire a quitté le match.')).toBeInTheDocument();
   });
 
   it('bascule en « en cours » quand la connexion pair-à-pair s’établit', async () => {
@@ -384,7 +384,7 @@ describe('Appel audiovisuel', () => {
       expect(fakeSocket.emitted.some((entry) => entry.event === 'media:offer')).toBe(true);
     });
 
-    expect(await screen.findByText('Connexion à l’appel…')).toBeInTheDocument();
+    expect(await screen.findByText('Coup d’envoi…')).toBeInTheDocument();
 
     const peer = FakePeerConnection.instances[0];
 
@@ -395,8 +395,8 @@ describe('Appel audiovisuel', () => {
       await flushPendingTasks();
     });
 
-    expect(screen.getByRole('region', { name: 'Appel en cours' })).toBeInTheDocument();
-    expect(screen.queryByText('Connexion à l’appel…')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Match en cours' })).toBeInTheDocument();
+    expect(screen.queryByText('Coup d’envoi…')).not.toBeInTheDocument();
   });
 
   it('ne rebascule pas en « connexion » après l’arrivée du flux distant', async () => {
@@ -423,8 +423,8 @@ describe('Appel audiovisuel', () => {
       await flushPendingTasks();
     });
 
-    expect(screen.getByRole('region', { name: 'Appel en cours' })).toBeInTheDocument();
-    expect(screen.queryByText('Connexion à l’appel…')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Match en cours' })).toBeInTheDocument();
+    expect(screen.queryByText('Coup d’envoi…')).not.toBeInTheDocument();
   });
 });
 
@@ -434,7 +434,7 @@ describe('Signalement d’abus', () => {
     fakeSocket.emitted.length = 0;
     fakeSocket.connected = true;
     reportsCreateMock.mockClear();
-    window.localStorage.setItem('i-keketa.auth.token', 'jeton-de-test');
+    window.localStorage.setItem('i-keketa.session.token', 'jeton-de-test');
   });
 
   it('ouvre le formulaire de signalement', async () => {
@@ -475,7 +475,7 @@ describe('Signalement d’abus', () => {
     await enterSession();
 
     await user.click(await screen.findByRole('button', { name: '🚩 Signaler' }));
-    await user.click(await screen.findByRole('button', { name: 'Envoyer le signalement' }));
+    await user.click(screen.getByRole('button', { name: 'Envoyer le signalement' }));
 
     expect(await screen.findByText('Trop de signalements envoyés.')).toBeInTheDocument();
   });

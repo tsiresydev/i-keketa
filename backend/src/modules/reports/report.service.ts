@@ -7,7 +7,7 @@ import { sanitizeText } from '../../utils/text';
 import type { ReportCreateInput } from '../../schemas/media.schema';
 
 export interface ReportWithPartner extends ReportDto {
-  reportedPseudonym: string;
+  reportedDisplayName: string;
 }
 
 /**
@@ -75,11 +75,11 @@ export const createReport = async (
     status: 'pending',
   });
 
-  const partner = await UserModel.findById(partnerId).select('pseudonym');
+  const partner = await UserModel.findById(partnerId).select('displayName');
 
   return {
     ...toReportDto(report),
-    reportedPseudonym: partner?.pseudonym ?? 'Anonyme',
+    reportedDisplayName: partner?.displayName ?? 'Anonyme',
   };
 };
 
@@ -94,16 +94,16 @@ export const listOwnReports = async (userId: string): Promise<ReportWithPartner[
     .sort({ createdAt: -1 })
     .limit(100);
 
-  const pseudonyms = await UserModel.find({
+  const partners = await UserModel.find({
     _id: { $in: reports.map((report) => report.reportedId) },
-  }).select('pseudonym');
+  }).select('displayName');
 
-  const pseudonymById = new Map(
-    pseudonyms.map((user) => [String(user._id), user.pseudonym as string]),
+  const displayNameById = new Map(
+    partners.map((user) => [String(user._id), user.displayName as string]),
   );
 
   return reports.map((report) => ({
     ...toReportDto(report),
-    reportedPseudonym: pseudonymById.get(String(report.reportedId)) ?? 'Anonyme',
+    reportedDisplayName: displayNameById.get(String(report.reportedId)) ?? 'Anonyme',
   }));
 };

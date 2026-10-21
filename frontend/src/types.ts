@@ -1,43 +1,19 @@
+/**
+ * Visiteur d'une session de discussion.
+ *
+ * Aucun compte n'est créé : l'identifiant technique anonyme (pseudonyme)
+ * reste côté serveur et n'est jamais exposé au client ni au partenaire.
+ */
 export interface PublicUser {
   id: string;
-  pseudonym: string;
-  displayName?: string;
+  displayName: string;
   role: 'user' | 'moderator' | 'admin';
-  interests: string[];
-  photoUrl?: string;
-  location?: string;
   createdAt: string;
-}
-
-export interface CurrentUser extends PublicUser {
-  email: string;
 }
 
 export interface AuthResponse {
   token: string;
-  user: CurrentUser;
-}
-
-export interface UserDirectoryResponse {
-  users: PublicUser[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-export interface UserSearchFilters {
-  q?: string;
-  interests?: string[];
-  location?: string;
-  page?: number;
-  limit?: number;
-}
-
-export interface ProfileUpdatePayload {
-  displayName?: string;
-  interests?: string[];
-  location?: string;
+  user: PublicUser;
 }
 
 export interface ChatMessage {
@@ -49,13 +25,12 @@ export interface ChatMessage {
 }
 
 /**
- * Profil du partenaire : le nom affiché et la photo ne sont présents
- * que si l'utilisateur les a explicitement renseignés (anonymat par défaut).
+ * Profil du partenaire : le nom affiché est le seul élément visible.
+ * Le pseudonyme reste interne (identifiant technique) et n'est jamais
+ * communiqué au partenaire.
  */
 export interface PartnerProfile {
-  pseudonym: string;
-  displayName?: string;
-  photoUrl?: string;
+  displayName: string;
 }
 
 export interface MatchFoundPayload {
@@ -122,7 +97,7 @@ export interface Report {
   reason: ReportReason;
   details?: string;
   status: 'pending';
-  reportedPseudonym: string;
+  reportedDisplayName: string;
   createdAt: string;
 }
 

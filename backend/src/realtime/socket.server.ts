@@ -5,7 +5,6 @@ import { logger } from '../config/logger';
 import { verifyAccessToken } from '../utils/jwt';
 import { findUserById } from '../modules/auth/auth.service';
 import { messageContentSchema } from '../schemas/auth.schema';
-import { directChatSchema } from '../schemas/chat.schema';
 import {
   mediaAcceptSchema,
   mediaAnswerSchema,
@@ -22,10 +21,7 @@ import { sanitizeText } from '../utils/text';
 
 export interface SocketUser {
   id: string;
-  email: string;
-  pseudonym: string;
-  displayName?: string;
-  photoUrl?: string;
+  displayName: string;
 }
 
 /**
@@ -123,10 +119,7 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
 
       socket.data.user = {
         id: String(user._id),
-        email: user.email,
-        pseudonym: user.pseudonym,
-        ...(user.displayName ? { displayName: user.displayName } : {}),
-        ...(user.photoUrl ? { photoUrl: user.photoUrl } : {}),
+        displayName: user.displayName,
       } satisfies SocketUser;
 
       return next();
@@ -181,22 +174,6 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
 
         await matchmaking.endMatch(user.id, 'user_skipped');
         await matchmaking.joinQueue(socket);
-      });
-    });
-
-    socket.on('chat:start', (payload: unknown) => {
-      runSafely(async () => {
-        const parsed = directChatSchema.safeParse(payload);
-
-        if (!parsed.success) {
-          socket.emit('chat:error', {
-            code: 'INVALID_TARGET',
-            message: 'Destinataire invalide.',
-          });
-          return;
-        }
-
-        await matchmaking.startDirectChat(socket, parsed.data.userId);
       });
     });
 

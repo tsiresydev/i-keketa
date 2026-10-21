@@ -77,56 +77,51 @@ a:focus-visible {
   min-height: 100%;
 }
 
-.auth-layout {
-  display: grid;
-  gap: 2rem;
+/* ---------- Page d'accueil ---------- */
+
+.home-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
   align-content: center;
+  justify-content: center;
   min-height: 100dvh;
   padding: 2rem 1.25rem;
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
 }
 
-.auth-brand {
+.home-page__hero {
   text-align: center;
 }
 
-.auth-brand__logo {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
+.home-page__title {
   font-size: 1.75rem;
-  font-weight: 700;
   letter-spacing: -0.02em;
 }
 
-.auth-brand__tagline {
-  color: var(--color-text-muted);
-  max-width: 32ch;
+.home-page__text {
+  max-width: 34ch;
   margin: 0.75rem auto 0;
+  color: var(--color-text-muted);
 }
 
-.auth-card {
+.home-page__form {
   width: 100%;
   max-width: 26rem;
   margin: 0 auto;
-  padding: 1.75rem;
+  padding: 1.5rem;
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
 }
 
-.auth-card__title {
-  font-size: 1.35rem;
+.home-page__form .button {
+  margin-top: 0.25rem;
 }
 
-.auth-card__subtitle {
-  color: var(--color-text-muted);
-  font-size: 0.95rem;
-  margin-bottom: 1.5rem;
-}
-
-.auth-card__footer {
-  margin: 1.25rem 0 0;
+.home-page__footer {
+  margin: 0;
   font-size: 0.9rem;
   color: var(--color-text-muted);
   text-align: center;
@@ -158,6 +153,7 @@ a:focus-visible {
 
 .input {
   width: 100%;
+  min-height: 2.75rem;
   padding: 0.75rem 0.9rem;
   font: inherit;
   font-size: 1rem;
@@ -192,6 +188,7 @@ a:focus-visible {
   justify-content: center;
   gap: 0.5rem;
   width: 100%;
+  min-height: 2.75rem;
   padding: 0.8rem 1.1rem;
   font: inherit;
   font-weight: 600;
@@ -230,7 +227,8 @@ a:focus-visible {
 
 .button--ghost {
   width: auto;
-  padding: 0.45rem 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.9rem;
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--color-text-muted);
@@ -269,14 +267,20 @@ a:focus-visible {
 }
 
 .alert__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
   margin-left: auto;
-  padding: 0 0.25rem;
   color: inherit;
   background: none;
   border: none;
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
+  border-radius: var(--radius-sm);
 }
 
 /* ---------- Écran de chargement ---------- */
@@ -320,6 +324,7 @@ a:focus-visible {
   gap: 0.75rem;
   flex-wrap: wrap;
   padding: 0.7rem 1rem;
+  padding-top: calc(0.7rem + env(safe-area-inset-top));
   background: var(--color-bg-elevated);
   border-bottom: 1px solid var(--color-border);
 }
@@ -336,44 +341,19 @@ a:focus-visible {
   color: var(--color-accent);
 }
 
-.app-header__nav {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-}
-
-.app-header__link {
-  padding: 0.35rem 0.7rem;
-  font-size: 0.88rem;
-  color: var(--color-text-muted);
-  border-radius: 999px;
-  border: 1px solid transparent;
-}
-
-.app-header__link:hover {
-  color: var(--color-text);
-  text-decoration: none;
-  background: var(--color-bg-soft);
-}
-
-.app-header__link.is-active {
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
-  border-color: rgba(255, 122, 89, 0.35);
-}
-
 .app-header__identity {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   margin-left: auto;
+  min-width: 0;
 }
 
 .app-header__identity-text {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  min-width: 0;
   font-size: 0.78rem;
   color: var(--color-text-muted);
 }
@@ -381,6 +361,10 @@ a:focus-visible {
 .app-header__identity-text strong {
   color: var(--color-text);
   font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 9rem;
 }
 
 .app-header__logout {
@@ -423,89 +407,7 @@ a:focus-visible {
   font-weight: 700;
 }
 
-/* ---------- Pages (profil, découverte) ---------- */
-
-.page {
-  min-height: 100dvh;
-}
-
-.page__main {
-  width: 100%;
-  max-width: 48rem;
-  margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
-}
-
-.page__title {
-  font-size: 1.6rem;
-  margin-bottom: 0.25rem;
-}
-
-.page__subtitle {
-  color: var(--color-text-muted);
-  font-size: 0.92rem;
-  margin-bottom: 1.5rem;
-}
-
-.card {
-  padding: 1.25rem;
-  margin-bottom: 1.25rem;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-}
-
-.card__title {
-  font-size: 1.1rem;
-  margin-bottom: 1rem;
-}
-
-.card__counter {
-  color: var(--color-text-muted);
-  font-weight: 400;
-}
-
-.empty-state {
-  color: var(--color-text-muted);
-  font-size: 0.92rem;
-  margin: 0;
-}
-
-.form-section {
-  margin: 0 0 1rem;
-  padding: 1rem;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.form-section__legend {
-  padding: 0 0.4rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.photo-row {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  flex-wrap: wrap;
-}
-
-.photo-row__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.photo-row__actions .form-field__hint {
-  flex-basis: 100%;
-  margin: 0;
-}
+/* ---------- Utilitaires ---------- */
 
 .visually-hidden {
   position: absolute;
@@ -519,126 +421,12 @@ a:focus-visible {
   border: 0;
 }
 
-/* ---------- Liste des utilisateurs ---------- */
-
-.user-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.user-card {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.75rem;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  flex-wrap: wrap;
-}
-
-.user-card__body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  flex: 1;
-  min-width: 12rem;
-}
-
-.user-card__name {
-  font-weight: 600;
-}
-
-.user-card__pseudonym {
-  color: var(--color-text-muted);
-  font-weight: 400;
-  font-size: 0.85rem;
-}
-
-.user-card__meta {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-}
-
-.user-card__action {
-  width: auto;
-  padding: 0.5rem 0.9rem;
-  font-size: 0.85rem;
-}
-
-.tag-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  margin-top: 0.15rem;
-}
-
-.tag {
-  padding: 0.1rem 0.5rem;
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-}
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.pagination .button {
-  width: auto;
-  padding: 0.45rem 0.9rem;
-  font-size: 0.85rem;
-}
-
-.pagination__status {
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-}
-
 /* ---------- Page de chat ---------- */
 
 .chat-page {
   display: flex;
   flex-direction: column;
   height: 100dvh;
-}
-
-.chat-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  background: var(--color-bg-elevated);
-  border-bottom: 1px solid var(--color-border);
-}
-.chat-header__brand {
-  font-weight: 700;
-  font-size: 1.05rem;
-  margin-right: auto;
-}
-
-.chat-header__user {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-  margin-right: 0.5rem;
-}
-
-.chat-header__user strong {
-  color: var(--color-text);
-  font-size: 0.85rem;
 }
 
 .status-dot {
@@ -939,7 +727,12 @@ a:focus-visible {
 }
 
 .call-control {
-  padding: 0.5rem 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0.5rem 0.95rem;
   font: inherit;
   font-size: 0.85rem;
   font-weight: 500;
@@ -1039,5 +832,32 @@ a:focus-visible {
 
   .auth-card {
     margin: 0;
+  }
+}
+
+@media (max-width: 47.99rem) {
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal {
+    max-width: 100%;
+    max-height: 90dvh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .partner-bar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .partner-bar__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .app-header__identity-text strong {
+    max-width: 7rem;
   }
 }
