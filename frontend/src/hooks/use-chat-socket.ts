@@ -62,6 +62,7 @@ const initialState: ChatSocketState = {
 export const useChatSocket = (token: string | null): ChatSocketState & ChatSocketActions => {
   const [state, setState] = useState<ChatSocketState>(initialState);
   const socketRef = useRef<Socket | null>(null);
+  const isSkippingRef = useRef(false);
 
   useEffect(() => {
     if (!token) {
@@ -147,14 +148,24 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
     });
 
     socket.on('match:ended', (payload: MatchEndedPayload) => {
+      const autoRejoin = payload.reason === 'user_skipped' && !isSkippingRef.current;
+
+      isSkippingRef.current = false;
+
       setState((previous) => ({
         ...previous,
-        chatStatus: 'idle',
+        chatStatus: autoRejoin ? 'waiting' : 'idle',
         matchId: null,
         partnerDisplayName: null,
         messages: [],
-        notice: END_REASON_MESSAGES[payload.reason] ?? 'La discussion est terminée.',
+        notice: autoRejoin
+          ? 'Votre partenaire est passé à quelqu’un d’autre. Recherche d’un nouvel inconnu…'
+          : (END_REASON_MESSAGES[payload.reason] ?? 'La discussion est terminée.'),
       }));
+
+      if (autoRejoin) {
+        socketRef.current?.emit('queue:join');
+      }
     });
 
     socket.on('chat:error', (payload: ChatErrorPayload) => {
@@ -182,6 +193,7 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
   }, []);
 
   const skipPartner = useCallback(() => {
+    isSkippingRef.current = true;
     socketRef.current?.emit('chat:skip');
   }, []);
 
