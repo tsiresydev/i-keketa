@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { Alert } from '../components/Alert';
 import { AppHeader } from '../components/AppHeader';
 import { ChatComposer } from '../components/ChatComposer';
@@ -11,6 +11,8 @@ import { useMediaCall } from '../hooks/use-media-call';
 export const ChatPage = () => {
   const { user, token } = useSession();
   const messageListRef = useRef<HTMLUListElement>(null);
+  const modalListRef = useRef<HTMLUListElement>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const {
     connectionStatus,
@@ -94,10 +96,20 @@ export const ChatPage = () => {
     }
   }, [messages]);
 
+  // Défile automatiquement vers le dernier message reçu (fenêtre modale).
+  useEffect(() => {
+    const list = modalListRef.current;
+
+    if (list && isChatOpen) {
+      list.scrollTop = list.scrollHeight;
+    }
+  }, [messages, isChatOpen]);
+
   const isMatched = chatStatus === 'matched' && matchId !== null;
   const partnerName = partnerDisplayName ?? '';
   const partnerInitial = partnerName.slice(0, 1).toUpperCase();
   const isCallActive = callStatus !== 'idle';
+  const isInCall = callStatus === 'in-call';
 
   return (
     <div className="app-shell chat-page">
@@ -126,6 +138,67 @@ export const ChatPage = () => {
           <Alert variant="notice" onClose={clearCallNotice}>
             {callNotice}
           </Alert>
+        ) : null}
+
+        {isInCall ? (
+          <>
+            <button
+              type="button"
+              className="chat-bubble"
+              onClick={() => setIsChatOpen(true)}
+              aria-label="Ouvrir la discussion"
+              title="Discussion"
+            >
+              💬
+              {messages.length > 0 ? (
+                <span className="chat-bubble__badge">{messages.length}</span>
+              ) : null}
+            </button>
+
+            {isChatOpen ? (
+              <div className="modal-backdrop" onClick={() => setIsChatOpen(false)}>
+                <div
+                  className="modal chat-modal"
+                  role="dialog"
+                  aria-label="Discussion"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <h2 className="modal__title">Discussion</h2>
+                  <ul
+                    className="message-list chat-modal__list"
+                    ref={modalListRef}
+                    role="log"
+                    aria-live="polite"
+                    aria-label="Messages"
+                  >
+                    {messages.length === 0 ? (
+                      <li className="message-list__empty">
+                        Démarrez la conversation par un bonjour 👋
+                      </li>
+                    ) : (
+                      messages.map((message) => (
+                        <MessageBubble
+                          key={message.id}
+                          message={message}
+                          isOwn={message.senderId === user?.id}
+                        />
+                      ))
+                    )}
+                  </ul>
+                  <ChatComposer disabled={!isMatched} onSend={sendMessage} />
+                  <div className="modal__actions">
+                    <button
+                      type="button"
+                      className="button button--secondary"
+                      onClick={() => setIsChatOpen(false)}
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </>
         ) : null}
 
         {isMatched ? (
@@ -164,27 +237,33 @@ export const ChatPage = () => {
               onToggleCamera={toggleCamera}
             />
 
-            <ul
-              className="message-list"
-              ref={messageListRef}
-              role="log"
-              aria-live="polite"
-              aria-label="Messages"
-            >
-              {messages.length === 0 ? (
-                <li className="message-list__empty">Démarrez la conversation par un bonjour 👋</li>
-              ) : (
-                messages.map((message) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    isOwn={message.senderId === user?.id}
-                  />
-                ))
-              )}
-            </ul>
+            {!isInCall ? (
+              <>
+                <ul
+                  className="message-list"
+                  ref={messageListRef}
+                  role="log"
+                  aria-live="polite"
+                  aria-label="Messages"
+                >
+                  {messages.length === 0 ? (
+                    <li className="message-list__empty">
+                      Démarrez la conversation par un bonjour 👋
+                    </li>
+                  ) : (
+                    messages.map((message) => (
+                      <MessageBubble
+                        key={message.id}
+                        message={message}
+                        isOwn={message.senderId === user?.id}
+                      />
+                    ))
+                  )}
+                </ul>
 
-            <ChatComposer disabled={!isMatched} onSend={sendMessage} />
+                <ChatComposer disabled={!isMatched} onSend={sendMessage} />
+              </>
+            ) : null}
           </>
         ) : chatStatus === 'waiting' ? (
           <section className="chat-panel" aria-live="polite">
