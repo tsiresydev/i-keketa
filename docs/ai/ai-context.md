@@ -65,12 +65,19 @@ Frontend + backend séparés; API REST (proposée) entre les deux; DB MongoDB. D
 ## État d'avancement
 
 - Sprint 1 (inscription/connexion, chat aléatoire, messagerie texte) : **implémenté et testé**.
-- Sprint 2 (profil utilisateur, filtres de recherche) : à démarrer.
-- Sprint 3 (messagerie audiovisuelle, signalement) : à démarrer.
+- Sprint 2 (profil utilisateur, filtres de recherche) : **implémenté et testé**.
+- Sprint 3 (messagerie audiovisuelle, signalement) : **implémenté et testé**.
+  - Signalisation WebRTC pair-à-pair relayée par Socket.IO (événements `media:*`), sessions d'appel
+    (`CallSession`) et interface d'appel (`VideoCallPanel`).
+  - Signalement d'abus (`POST /api/reports`, `GET /api/reports/me`) : l'utilisateur signalé est
+    toujours l'autre participant, un signalement par session et par auteur (`409`), statut
+    `pending` uniquement.
+  - **Modération hors périmètre** : aucun outil de traitement ni sanction ; les signalements sont
+    seulement enregistrés.
 
 ## Questions encore ouvertes
 
-- Stockage des médias (audio/vidéo) — à valider (Sprint 3).
+- Serveur TURN pour les appels WebRTC (réseaux restrictifs) — à valider.
 - Mise à l'échelle du temps réel multi-instance (file d'attente en mémoire) — à évaluer si le
   déploiement devient multi-instance.
 - Déploiement Vercel / Render : configuration à créer.

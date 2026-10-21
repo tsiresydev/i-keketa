@@ -6,6 +6,7 @@ import { env } from './config/env';
 import { authRouter } from './modules/auth/auth.routes';
 import { userRouter } from './modules/users/user.routes';
 import { chatRouter } from './modules/chat/chat.routes';
+import { reportRouter } from './modules/reports/report.routes';
 import { photoPublicRoot } from './modules/users/photo-storage.service';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { globalLimiter } from './middleware/rate-limiters';
@@ -52,6 +53,7 @@ export const createApp = (): Express => {
   app.use('/api/auth', authRouter);
   app.use('/api/users', userRouter);
   app.use('/api/chat', chatRouter);
+  app.use('/api/reports', reportRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

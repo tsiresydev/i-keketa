@@ -78,5 +78,59 @@ export interface ChatErrorPayload {
   message: string;
 }
 
+/* ---------- Sprint 3 : appel audiovisuel et signalement ---------- */
+
+/**
+ * États possibles d'un appel audiovisuel.
+ * - `idle` : aucun appel.
+ * - `requesting` : appel demandé, en attente de la réponse du partenaire.
+ * - `ringing` : appel entrant, en attente de l'utilisateur.
+ * - `connecting` : médias negotiating (négociation WebRTC en cours).
+ * - `in-call` : appel en cours.
+ */
+export type MediaCallStatus = 'idle' | 'requesting' | 'ringing' | 'connecting' | 'in-call';
+
+export interface MediaCallStatePayload {
+  matchId: string;
+  audio: boolean;
+  video: boolean;
+}
+
+export const REPORT_REASONS = [
+  'harassment',
+  'inappropriate_content',
+  'nudity',
+  'spam',
+  'scam',
+  'other',
+] as const;
+
+export type ReportReason = (typeof REPORT_REASONS)[number];
+
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  harassment: 'Harcèlement ou insultes',
+  inappropriate_content: 'Contenu inapproprié',
+  nudity: 'Nudité ou contenu sexuel',
+  spam: 'Spam ou publicité',
+  scam: 'Arnaque ou tentative d’escroquerie',
+  other: 'Autre comportement inapproprié',
+};
+
+export interface Report {
+  id: string;
+  matchId: string;
+  reason: ReportReason;
+  details?: string;
+  status: 'pending';
+  reportedPseudonym: string;
+  createdAt: string;
+}
+
+export interface ReportCreatePayload {
+  matchId: string;
+  reason: ReportReason;
+  details?: string;
+}
+
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 export type ChatStatus = 'idle' | 'waiting' | 'matched';

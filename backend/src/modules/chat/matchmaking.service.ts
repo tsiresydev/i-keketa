@@ -64,9 +64,18 @@ export class MatchmakingService {
   private readonly activeMatches = new Map<string, ActiveMatch>();
   /** Dernier socket connu pour chaque utilisateur connecté. */
   private readonly socketsByUser = new Map<string, Socket>();
+  /** Rappelé à chaque fin de session (utilisé pour clore les appels audiovisuels). */
+  private onMatchEnded: ((matchId: string) => void) | null = null;
 
   constructor(io: Server) {
     this.io = io;
+  }
+
+  /**
+   * Enregistre le rappel invoqué à la fin d'une session de chat.
+   */
+  setOnMatchEnded(callback: (matchId: string) => void): void {
+    this.onMatchEnded = callback;
   }
 
   /**
@@ -256,6 +265,8 @@ export class MatchmakingService {
     }
 
     this.io.to(matchRoom(matchId)).emit('match:ended', { matchId, reason });
+
+    this.onMatchEnded?.(matchId);
   }
 
   getActiveMatch(userId: string): ActiveMatch | undefined {

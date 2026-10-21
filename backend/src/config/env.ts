@@ -38,6 +38,13 @@ const envSchema = z.object({
     .positive()
     .default(2 * 1024 * 1024),
   PHOTO_STORAGE_DIR: z.string().default('uploads/photos'),
+  REPORT_DETAILS_MAX_LENGTH: z.coerce.number().int().positive().default(1000),
+  REPORT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
+  REPORT_RATE_LIMIT_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60 * 1000),
   USE_IN_MEMORY_DB: booleanFromEnv(false),
   MONGOMS_VERSION: z.string().default('7.0.24'),
 });

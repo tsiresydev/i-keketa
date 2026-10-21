@@ -341,6 +341,128 @@ const main = async () => {
     directPayload.message.content,
   );
 
+  /* ---------- Sprint 3 : signalisation audiovisuelle et signalements ---------- */
+
+  const callRequest = waitFor(tianaSocket, 'media:request');
+  alice.emit('media:request', { matchId: directEvent.matchId, audio: true, video: true });
+  const callRequestPayload = await callRequest;
+  check(
+    'Demande d’appel reliée au partenaire',
+    callRequestPayload.matchId === directEvent.matchId && callRequestPayload.audio === true,
+    `match ${callRequestPayload.matchId}`,
+  );
+
+  const callAccepted = waitFor(alice, 'media:accepted');
+  tianaSocket.emit('media:accept', { matchId: directEvent.matchId });
+  const acceptedPayload = await callAccepted;
+  check(
+    'Acceptation d’appel reliée à l’appelant',
+    acceptedPayload.matchId === directEvent.matchId,
+    `match ${acceptedPayload.matchId}`,
+  );
+
+  const offerReceived = waitFor(tianaSocket, 'media:offer');
+  alice.emit('media:offer', {
+    matchId: directEvent.matchId,
+    description: JSON.stringify({ type: 'offer', sdp: 'v=0' }),
+  });
+  const offerPayload = await offerReceived;
+  check(
+    'Offre SDP reliée au partenaire',
+    offerPayload.description.includes('offer'),
+    offerPayload.description.slice(0, 24),
+  );
+
+  const answerReceived = waitFor(alice, 'media:answer');
+  tianaSocket.emit('media:answer', {
+    matchId: directEvent.matchId,
+    description: JSON.stringify({ type: 'answer', sdp: 'v=0' }),
+  });
+  const answerPayload = await answerReceived;
+  check(
+    'Réponse SDP reliée à l’appelant',
+    answerPayload.description.includes('answer'),
+    answerPayload.description.slice(0, 24),
+  );
+
+  const candidateReceived = waitFor(tianaSocket, 'media:candidate');
+  alice.emit('media:candidate', {
+    matchId: directEvent.matchId,
+    candidate: JSON.stringify({ candidate: 'candidate:1 1 udp', sdpMid: '0' }),
+  });
+  const candidatePayload = await candidateReceived;
+  check(
+    'Candidat ICE relié au partenaire',
+    candidatePayload.candidate.includes('candidate'),
+    candidatePayload.candidate.slice(0, 24),
+  );
+
+  const stateReceived = waitFor(tianaSocket, 'media:state');
+  alice.emit('media:state', { matchId: directEvent.matchId, audio: false, video: true });
+  const statePayload = await stateReceived;
+  check(
+    'État micro/caméra relié au partenaire',
+    statePayload.audio === false && statePayload.video === true,
+    `audio ${statePayload.audio}, video ${statePayload.video}`,
+  );
+
+  const callEnded = waitFor(tianaSocket, 'media:ended');
+  alice.emit('media:end', { matchId: directEvent.matchId });
+  const endedPayload = await callEnded;
+  check(
+    'Fin d’appel reliée au partenaire',
+    endedPayload.matchId === directEvent.matchId && endedPayload.reason === 'hangup',
+    `raison ${endedPayload.reason}`,
+  );
+
+  const report = await call('/api/reports', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      matchId: directEvent.matchId,
+      reason: 'harassment',
+      details: 'Insistances déplacées.',
+    }),
+  });
+  check(
+    'POST /api/reports',
+    report.status === 201 &&
+      report.body?.report?.status === 'pending' &&
+      report.body?.report?.reportedPseudonym === third.body.user.pseudonym,
+    `statut ${report.status}`,
+  );
+
+  const duplicateReport = await call('/api/reports', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ matchId: directEvent.matchId, reason: 'harassment' }),
+  });
+  check(
+    'POST /api/reports (doublon refusé)',
+    duplicateReport.status === 409,
+    `statut ${duplicateReport.status}`,
+  );
+
+  const outsiderReport = await call('/api/reports', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${second.body.token}` },
+    body: JSON.stringify({ matchId: directEvent.matchId, reason: 'spam' }),
+  });
+  check(
+    'POST /api/reports (tiers refusé)',
+    outsiderReport.status === 404,
+    `statut ${outsiderReport.status}`,
+  );
+
+  const ownReports = await call('/api/reports/me', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  check(
+    'GET /api/reports/me',
+    ownReports.status === 200 && ownReports.body?.reports?.length === 1,
+    `statut ${ownReports.status}, ${ownReports.body?.reports?.length ?? 0} signalement(s)`,
+  );
+
   tianaSocket.disconnect();
   alice.disconnect();
   bob.disconnect();

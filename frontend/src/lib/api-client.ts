@@ -3,6 +3,8 @@ import type {
   ChatMessage,
   CurrentUser,
   ProfileUpdatePayload,
+  Report,
+  ReportCreatePayload,
   UserDirectoryResponse,
   UserSearchFilters,
 } from '../types';
@@ -175,4 +177,16 @@ export const usersApi = {
       token,
     );
   },
+};
+
+export const reportsApi = {
+  create: (token: string, payload: ReportCreatePayload): Promise<{ report: Report }> =>
+    request<{ report: Report }>(
+      '/api/reports',
+      { method: 'POST', body: JSON.stringify(payload) },
+      token,
+    ),
+
+  listOwn: (token: string): Promise<{ reports: Report[] }> =>
+    request<{ reports: Report[] }>('/api/reports/me', { method: 'GET' }, token),
 };

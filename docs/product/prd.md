@@ -110,8 +110,12 @@ Faciliter les rencontres amicales et les échanges anonymes entre utilisateurs m
 |--------|---------|------|
 | Sprint 1 | Inscription/connexion, chat aléatoire, messagerie texte temps réel | **Livré** (React + Express + MongoDB + Socket.IO) |
 | Sprint 2 | Profil utilisateur (nom, intérêts, localisation, photo), filtres de recherche, discussion directe | **Livré** (pages `/profil` et `/decouvrir`, `PUT /api/users/me`, `POST|DELETE /api/users/me/photo`, `GET /api/users`, événement `chat:start`) |
-| Sprint 3 | Messagerie audiovisuelle, signalement d'abus, modération | Non démarré |
+| Sprint 3 | Messagerie audiovisuelle, signalement d'abus | **Livré pour l'A/V et le signalement** (WebRTC pair-à-pair, signalisation `media:*`, `POST /api/reports`, `GET /api/reports/me`). La **modération n'est pas implémentée** : hors périmètre validé, les signalements restent au statut `pending` et aucun outil de traitement ou de sanction n'est exposé |
 
-Le cahier des charges reste la source de vérité. Les choix techniques appliqués aux Sprints 1 et 2
-(React, Socket.IO, JWT, Zod, bcrypt, stockage local des photos) sont documentés dans
-`docs/architecture/architecture.md` et restent ouverts à validation par le responsable de projet.
+Le cahier des charges reste la source de vérité. Les choix techniques appliqués aux Sprints 1, 2 et 3
+(React, Socket.IO, JWT, Zod, bcrypt, stockage local des photos, WebRTC pair-à-pair) sont documentés
+dans `docs/architecture/architecture.md` et restent ouverts à validation par le responsable de projet.
+
+La modération des discussions, prévue par le cahier des charges pour le Sprint 3, reste à
+concevoir et à valider (traitement manuel ou automatisé, consultation des signalements,
+sanctions) : elle n'est pas implémentée dans cette version.

@@ -30,6 +30,8 @@ Préfixe des routes REST : `/api`. Format d'erreur unique :
 | DELETE | /api/users/me/photo | Bearer | Suppression de la photo de profil | 200 `{ user }` |
 | GET | /api/users | Bearer | Annuaire des utilisateurs (filtres + pagination) | 200 `{ users, total, page, limit, totalPages }` |
 | GET | /api/chat/matches/:matchId/messages | Bearer | Historique d'une session de chat | 200 `{ matchId, messages }` |
+| POST | /api/reports | Bearer | Signalement d'abus du partenaire de la session | 201 `{ report }` |
+| GET | /api/reports/me | Bearer | Signalements émis par l'utilisateur courant | 200 `{ reports }` |
 | GET | /uploads/photos/:fichier | — | Photo de profil servie en statique | 200 (image) |
 
 ### Objets renvoyés
@@ -64,6 +66,20 @@ Le partenaire ne reçoit jamais l'email : il ne voit que le `pseudonym` anonyme.
   "senderId": "652f1a...",
   "content": "Salut, ça va ?",
   "createdAt": "2026-10-20T10:01:00.000Z"
+}
+```
+
+`report` :
+
+```json
+{
+  "id": "652f1d...",
+  "matchId": "652f1c...",
+  "reason": "harassment",
+  "details": "Insistances déplacées.",
+  "status": "pending",
+  "reportedPseudonym": "Mety-CD34",
+  "createdAt": "2026-10-20T10:05:00.000Z"
 }
 ```
 
@@ -120,8 +136,37 @@ L'utilisateur connecté n'apparaît jamais dans sa propre liste.
 }
 ```
 
-### Règles de validation
+### Signalement d'abus — `POST /api/reports`
 
+Corps JSON :
+
+```json
+{
+  "matchId": "652f1c...",
+  "reason": "harassment",
+  "details": "Insistances déplacées."
+}
+```
+
+| Champ | Type | Règles |
+|-------|------|--------|
+| `matchId` | chaîne | Identifiant de la session de chat (obligatoire) |
+| `reason` | énumération | `harassment`, `inappropriate_content`, `nudity`, `spam`, `scam`, `other` |
+| `details` | chaîne | Facultatif, 1000 caractères maximum (`REPORT_DETAILS_MAX_LENGTH`) |
+
+Règles :
+
+- L'utilisateur signalé est **toujours l'autre participant** de la session : le client ne peut pas
+  désigner une tierce personne (`reportedId` est dérivé côté serveur).
+- Seuls les participants actifs d'une session peuvent signaler : sinon `404`.
+- Un seul signalement par auteur et par session : un doublon renvoie `409`.
+- Le signalement est enregistré avec le statut `pending` : la modération (consultation, traitement,
+  sanction) **n'est pas implémentée**, aucun outil de traitement n'est exposé.
+- L'utilisateur ne consulte que ses propres signalements (`GET /api/reports/me`, 100 derniers).
+- Limitation de débit dédiée : `REPORT_RATE_LIMIT_MAX` signalements par
+  `REPORT_RATE_LIMIT_WINDOW_MS` (`429`).
+
+### Règles de validation
 - `email` : format email valide, normalisé en minuscules, 254 caractères maximum.
 - `password` (inscription) : 8 à 128 caractères, au moins une minuscule, une majuscule et un chiffre.
 - `password` (connexion) : non vide (la force n'est pas re-vérifiée à la connexion).
@@ -137,8 +182,8 @@ L'utilisateur connecté n'apparaît jamais dans sa propre liste.
 | 400 | Requête invalide | Validation Zod, corps malformé |
 | 401 | Non authentifié | Jeton absent, invalide ou expiré, identifiants erronés |
 | 403 | Interdit | Accès à l'historique d'une session dont on ne fait pas partie |
-| 404 | Introuvable | Route inconnue, session de chat inexistante |
-| 409 | Conflit | Email déjà utilisé |
+| 404 | Introuvable | Route inconnue, session de chat inexistante, session non signalable |
+| 409 | Conflit | Email déjà utilisé, signalement déjà envoyé pour cette session |
 | 429 | Trop de requêtes | Limitation de débit |
 | 500 | Erreur interne | Détails journalisés côté serveur uniquement |
 
@@ -165,6 +210,13 @@ Une connexion sans jeton valide est rejetée (`connect_error`).
 | `chat:skip` | — | Termine la session en cours et rejoint la file d'attente |
 | `chat:start` | `{ userId }` | Démarre une discussion directe avec l'utilisateur ciblé |
 | `chat:message` | `{ matchId, content }` | Envoie un message texte |
+| `media:request` | `{ matchId, audio, video }` | Demande un appel audiovisuel au partenaire |
+| `media:accept` | `{ matchId }` | Accepte l'appel entrant |
+| `media:offer` | `{ matchId, description }` | Description SDP (offre) |
+| `media:answer` | `{ matchId, description }` | Description SDP (réponse) |
+| `media:candidate` | `{ matchId, candidate }` | Candidat ICE (sérialisé en JSON) |
+| `media:state` | `{ matchId, audio, video }` | État du micro et de la caméra |
+| `media:end` | `{ matchId }` | Raccroche l'appel |
 
 ### Événements serveur → client
 
@@ -175,7 +227,14 @@ Une connexion sans jeton valide est rejetée (`connect_error`).
 | `match:ended` | `{ matchId, reason }` | Fin de session (`user_skipped`, `partner_disconnected`, `user_disconnected`) |
 | `chat:history` | `{ matchId, messages }` | Historique de la session (100 derniers messages) |
 | `chat:message` | `{ message }` | Message reçu (émis par l'expéditeur ou le partenaire) |
-| `chat:error` | `{ code, message }` | Erreur applicative (`INVALID_MESSAGE`, `NO_ACTIVE_MATCH`, `RATE_LIMITED`, `MESSAGE_FAILED`, `UNAUTHORIZED`, `USER_UNAVAILABLE`, `INVALID_TARGET`) |
+| `chat:error` | `{ code, message }` | Erreur applicative (`INVALID_MESSAGE`, `NO_ACTIVE_MATCH`, `RATE_LIMITED`, `MESSAGE_FAILED`, `UNAUTHORIZED`, `USER_UNAVAILABLE`, `INVALID_TARGET`, `INVALID_PAYLOAD`, `CALL_ALREADY_ACTIVE`, `CALL_NOT_FOUND`) |
+| `media:request` | `{ matchId, audio, video }` | Demande d'appel reçue |
+| `media:accepted` | `{ matchId }` | L'appel a été accepté |
+| `media:offer` | `{ matchId, description }` | Offre SDP reçue |
+| `media:answer` | `{ matchId, description }` | Réponse SDP reçue |
+| `media:candidate` | `{ matchId, candidate }` | Candidat ICE reçu |
+| `media:state` | `{ matchId, audio, video }` | État micro/caméra du partenaire |
+| `media:ended` | `{ matchId, reason }` | Fin de l'appel (`hangup`, `partner_disconnected`, `media_failed`) |
 
 ### Règles temps réel
 
@@ -186,6 +245,38 @@ Une connexion sans jeton valide est rejetée (`connect_error`).
   (`WS_MESSAGE_RATE_MAX`, `WS_MESSAGE_RATE_WINDOW_MS`).
 - À la déconnexion d'un client, la session est clôturée (`partner_disconnected`) et le partenaire
   est prévenu.
+
+### Appel audiovisuel — événements `media:*`
+
+Le serveur ne transporte jamais les flux : il ne fait que **relayer** la signalisation entre les
+deux participants de la même session de chat. La négociation WebRTC (offre/réponse SDP et
+candidats ICE) est entièrement gérée par le navigateur.
+
+Déroulé d'un appel :
+
+1. L'appelant émet `media:request` ; le serveur crée une session d'appel (`pending`) et relaie
+   `media:request` au partenaire.
+2. Le partenaire émet `media:accept` ; le serveur passe la session d'appel en `active` et relaie
+   `media:accepted` à l'appelant.
+3. L'appelant crée l'offre SDP et l'envoie (`media:offer`) ; le partenaire répond (`media:answer`).
+   Les candidats ICE sont échangés au fur et à mesure (`media:candidate`).
+4. `media:state` informe le partenaire de la coupure du micro ou de la caméra.
+5. `media:end` (ou la fin de la session de chat) clôture l'appel : le serveur marque la session
+   d'appel `ended` et relaie `media:ended`.
+
+Règles :
+
+- Tous les événements `media:*` exigent une session de chat active avec le `matchId` fourni
+  (`NO_ACTIVE_MATCH` sinon).
+- Un seul appel à la fois par session (`CALL_ALREADY_ACTIVE`).
+- Un appel ne peut être accepté que s'il existe une session d'appel en attente (`CALL_NOT_FOUND`).
+- Une demande d'appel restée sans réponse est close après 60 secondes (`CALL_REQUEST_TIMEOUT_MS`) :
+  les deux participants reçoivent `media:ended` avec le motif `media_failed`.
+- L'appel est clôturé automatiquement à la fin de la session de chat, à la déconnexion d'un
+  participant ou au changement de partenaire.
+- Serveurs ICE : `VITE_STUN_URLS` côté frontend (liste séparée par des virgules), par défaut
+  `stun:stun.l.google.com:19302`. Aucun serveur TURN n'est configuré : la connectivité peut donc
+  échouer sur des réseaux restrictifs.
 
 ### Discussion directe — `chat:start`
 

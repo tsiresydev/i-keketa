@@ -16,26 +16,44 @@
 | Connexion : accès avec identifiants valides | Terminé | `backend/tests/auth.routes.test.ts` (4 cas) |
 | Chat aléatoire : mise en relation aléatoire fonctionnelle | Terminé | `backend/tests/realtime.test.ts` (9 cas), `scripts/e2e-check.cjs` |
 | Messagerie temps réel : messages délivrés en temps réel | Terminé | `backend/tests/realtime.test.ts`, `frontend/tests/chat-page.test.tsx` |
-| Profils / filtres / A/V / signalement / modération | **Non implémentés** (sprints 2 et 3) | Hors périmètre du Sprint 1 |
 
-## Vérifications exécutées (Sprint 1)
+## Détail par critère (Sprint 2)
+
+| Critère | État | Preuve |
+|---------|------|--------|
+| Profil : nom affiché, intérêts, localisation | Terminé | `backend/tests/user.routes.test.ts`, `frontend/tests/profile-page.test.tsx` |
+| Photo de profil (upload / suppression, formats contraints) | Terminé | `backend/tests/user.routes.test.ts` |
+| Annuaire : filtres (intérêts, localisation) + pagination | Terminé | `backend/tests/user.routes.test.ts`, `frontend/tests/discover-page.test.tsx` |
+| Discussion directe | Terminé | `backend/tests/realtime.test.ts`, `frontend/tests/chat-page.test.tsx` |
+
+## Détail par critère (Sprint 3)
+
+| Critère | État | Preuve |
+|---------|------|--------|
+| Appel audiovisuel : signalisation et négociation WebRTC | Terminé | `backend/tests/media.realtime.test.ts` (11 cas), `frontend/tests/call-and-report.test.tsx` (8 cas) |
+| Appel : refus, raccrochage, coupure micro/caméra | Terminé | `backend/tests/media.realtime.test.ts`, `frontend/tests/call-and-report.test.tsx` |
+| Signalement d'abus : motif, descriptif, statut `pending` | Terminé | `backend/tests/report.routes.test.ts` (10 cas), `frontend/tests/call-and-report.test.tsx` (4 cas) |
+| Signalement : doublon refusé, tiers refusé, `reportedId` dérivé | Terminé | `backend/tests/report.routes.test.ts` |
+| Modération (consultation, traitement, sanction) | **Hors périmètre** | Aucun outil exposé : les signalements restent `pending` |
+
+## Vérifications exécutées (Sprint 3)
 
 | Commande | Résultat |
 |----------|----------|
 | `npm run lint` | 0 erreur, 0 avertissement |
 | `npm run typecheck` | 0 erreur (backend + frontend) |
-| `npm run test:backend` | 44 tests / 44 réussis (6 fichiers) |
-| `npm run test:frontend` | 23 tests / 23 réussis (3 fichiers) |
+| `npm run test:backend` | 88 tests / 88 réussis (9 fichiers) |
+| `npm run test:frontend` | 50 tests / 50 réussis (6 fichiers) |
 | `npm run build` | Build backend (`dist/`) et frontend (`dist/`) réussi |
-| `npm audit` | 0 vulnérabilité |
-| `node scripts/e2e-check.cjs <url>` | 13/13 vérifications réussies sur serveur démarré |
-| Serveur de développement + proxy Vite | Parcours inscription → mise en relation → message validé |
+| `npm run verify` | lint + typecheck + tests + build réussis |
+| `node scripts/e2e-check.cjs <url>` | 39/39 vérifications réussies sur serveur démarré (dont 10 sur le Sprint 3) |
 
 ## Points non couverts par ce sprint
 
-- Tests de charge / performance (documentés au cahier des charges, non réalisés : hors périmètre
-  d'implémentation du Sprint 1).
+- Tests de charge / performance (documentés au cahier des charges, non réalisés).
 - Audit de sécurité externe, test de pénétration.
 - Déploiement Vercel / Render non configuré (variables d'environnement et fichiers de
   configuration de déploiement restent à créer).
-- Modération automatisée vs manuelle : à valider (Sprint 3).
+- Serveur TURN pour les appels WebRTC : seul STUN est configuré (`VITE_STUN_URLS`), la traversée
+  NAT stricte n'est donc pas gérée.
+- Modération automatisée vs manuelle : à valider (hors périmètre du Sprint 3).

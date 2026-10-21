@@ -72,7 +72,12 @@ describe('Page de profil', () => {
     await waitForSession();
 
     expect(await screen.findByLabelText('Nom affiché')).toBeInTheDocument();
-    expect(screen.getByLabelText('Centres d’intérêt')).toHaveValue('musique');
+
+    // Le formulaire est pré-rempli après le chargement de la session.
+    await waitFor(() => {
+      expect(screen.getByLabelText('Centres d’intérêt')).toHaveValue('musique');
+    });
+
     expect(
       screen.getByRole('button', { name: 'Enregistrer les modifications' }),
     ).toBeInTheDocument();

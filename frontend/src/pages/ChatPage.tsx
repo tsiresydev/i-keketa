@@ -4,8 +4,13 @@ import { Alert } from '../components/Alert';
 import { AppHeader } from '../components/AppHeader';
 import { ChatComposer } from '../components/ChatComposer';
 import { MessageBubble } from '../components/MessageBubble';
+import { ReportDialog } from '../components/ReportDialog';
+import { VideoCallPanel } from '../components/VideoCallPanel';
 import { useAuth } from '../hooks/use-auth';
 import { useChatSocket } from '../hooks/use-chat-socket';
+import { useMediaCall } from '../hooks/use-media-call';
+import { reportsApi } from '../lib/api-client';
+import type { ReportReason } from '../types';
 
 export const ChatPage = () => {
   const { user, token } = useAuth();
@@ -25,6 +30,7 @@ export const ChatPage = () => {
     messages,
     error,
     notice,
+    socket,
     joinQueue,
     leaveQueue,
     skipPartner,
@@ -33,6 +39,30 @@ export const ChatPage = () => {
     clearError,
     clearNotice,
   } = useChatSocket(token);
+
+  const {
+    status: callStatus,
+    localStream,
+    remoteStream,
+    isMicrophoneEnabled,
+    isCameraEnabled,
+    partnerMedia,
+    error: callError,
+    notice: callNotice,
+    startCall,
+    acceptCall,
+    declineCall,
+    endCall,
+    toggleMicrophone,
+    toggleCamera,
+    clearError: clearCallError,
+    clearNotice: clearCallNotice,
+  } = useMediaCall(socket, matchId);
+
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportSuccess, setReportSuccess] = useState<string | null>(null);
 
   // Défile automatiquement vers le dernier message reçu.
   useEffect(() => {
@@ -63,9 +93,38 @@ export const ChatPage = () => {
     startDirectChat(pendingTarget);
   }, [connectionStatus, pendingTarget, startDirectChat, setSearchParams]);
 
+  const handleReport = async (reason: ReportReason, details: string): Promise<void> => {
+    if (!token || !matchId) {
+      return;
+    }
+
+    setIsReporting(true);
+    setReportError(null);
+
+    try {
+      await reportsApi.create(token, {
+        matchId,
+        reason,
+        ...(details ? { details } : {}),
+      });
+
+      setIsReportOpen(false);
+      setReportSuccess('Signalement envoyé. Merci de nous avoir alertés.');
+    } catch (submitError) {
+      setReportError(
+        submitError instanceof Error
+          ? submitError.message
+          : 'Le signalement n’a pas pu être envoyé.',
+      );
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
   const isMatched = chatStatus === 'matched' && matchId !== null;
   const partnerName = partnerDisplayName ?? partnerPseudonym ?? '';
   const partnerInitial = partnerName.slice(0, 1).toUpperCase();
+  const isCallActive = callStatus !== 'idle';
 
   return (
     <div className="app-shell chat-page">
@@ -81,6 +140,24 @@ export const ChatPage = () => {
         {notice ? (
           <Alert variant="notice" onClose={clearNotice}>
             {notice}
+          </Alert>
+        ) : null}
+
+        {callError ? (
+          <Alert variant="error" onClose={clearCallError}>
+            {callError}
+          </Alert>
+        ) : null}
+
+        {callNotice ? (
+          <Alert variant="notice" onClose={clearCallNotice}>
+            {callNotice}
+          </Alert>
+        ) : null}
+
+        {reportSuccess ? (
+          <Alert variant="notice" onClose={() => setReportSuccess(null)}>
+            {reportSuccess}
           </Alert>
         ) : null}
 
@@ -104,7 +181,43 @@ export const ChatPage = () => {
               {partnerDisplayName && partnerPseudonym ? (
                 <span className="partner-bar__pseudonym">({partnerPseudonym})</span>
               ) : null}
+
+              <span className="partner-bar__actions">
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  onClick={() => void startCall()}
+                  disabled={isCallActive || connectionStatus !== 'connected'}
+                >
+                  📹 Appeler
+                </button>
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  onClick={() => {
+                    setReportError(null);
+                    setIsReportOpen(true);
+                  }}
+                >
+                  🚩 Signaler
+                </button>
+              </span>
             </div>
+
+            <VideoCallPanel
+              status={callStatus}
+              localStream={localStream}
+              remoteStream={remoteStream}
+              isMicrophoneEnabled={isMicrophoneEnabled}
+              isCameraEnabled={isCameraEnabled}
+              partnerMedia={partnerMedia}
+              partnerName={partnerName}
+              onAccept={() => void acceptCall()}
+              onDecline={declineCall}
+              onEnd={endCall}
+              onToggleMicrophone={toggleMicrophone}
+              onToggleCamera={toggleCamera}
+            />
 
             <ul
               className="message-list"
@@ -169,6 +282,15 @@ export const ChatPage = () => {
           </button>
         </footer>
       ) : null}
+
+      <ReportDialog
+        open={isReportOpen}
+        partnerName={partnerName}
+        isSubmitting={isReporting}
+        error={reportError}
+        onSubmit={(reason, details) => void handleReport(reason, details)}
+        onClose={() => setIsReportOpen(false)}
+      />
     </div>
   );
 };

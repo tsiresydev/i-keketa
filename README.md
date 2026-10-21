@@ -3,7 +3,7 @@
 Plateforme de chat en ligne pour les utilisateurs de Madagascar : rencontres aléatoires et
 échanges **anonymes**, via une interface web responsive pensée pour le mobile.
 
-Ce dépôt contient l'implémentation des **Sprints 1 et 2** (voir `docs/product/cahier-des-charges.md`) :
+Ce dépôt contient l'implémentation des **Sprints 1, 2 et 3** (voir `docs/product/cahier-des-charges.md`) :
 
 **Sprint 1**
 
@@ -18,7 +18,13 @@ Ce dépôt contient l'implémentation des **Sprints 1 et 2** (voir `docs/product
 - **Recherche de membres** (filtres intérêts / localisation / recherche textuelle, pagination)
 - **Discussion directe** (démarrage d'une session avec un membre choisi)
 
-> Les fonctions du Sprint 3 (audio/vidéo, signalement, modération) ne sont pas implémentées.
+**Sprint 3**
+
+- **Appel audiovisuel** (WebRTC pair-à-pair, signalisation relayée par Socket.IO, micro et caméra)
+- **Signalement d'abus** (motif, descriptif facultatif, statut `pending`)
+
+> La **modération** n'est pas implémentée : les signalements sont enregistrés et restent au statut
+> `pending`. Aucun outil de consultation, de traitement ou de sanction n'est exposé.
 
 ## Stack technique
 
@@ -59,17 +65,20 @@ cp backend/.env.example backend/.env     # Linux / macOS
 
 Puis renseignez au minimum `JWT_SECRET` dans `backend/.env`.
 
-| Variable                | Où       | Rôle                                                                                                               |
-| ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| `MONGODB_URI`           | backend  | URI MongoDB. Si vide **et** `USE_IN_MEMORY_DB=true`, un MongoDB en mémoire est démarré (développement uniquement). |
-| `USE_IN_MEMORY_DB`      | backend  | Démarre un MongoDB en mémoire lorsque `MONGODB_URI` est vide.                                                      |
-| `JWT_SECRET`            | backend  | Secret de signature des jetons (16 caractères minimum). **Obligatoire.**                                           |
-| `CORS_ORIGIN`           | backend  | Origines autorisées, séparées par des virgules.                                                                    |
-| `PORT`                  | backend  | Port du backend (3000 par défaut dans `.env.example`).                                                             |
-| `PHOTO_MAX_SIZE_BYTES`  | backend  | Taille maximale d'une photo de profil (2097152 = 2 Mo par défaut).                                                 |
-| `PHOTO_STORAGE_DIR`     | backend  | Dossier de stockage des photos, relatif au dossier de travail du backend.                                          |
-| `VITE_API_URL`          | frontend | URL de l'API appelée par le navigateur (vide = même origine).                                                      |
-| `VITE_API_PROXY_TARGET` | frontend | Cible du proxy de développement Vite (`/api`, `/uploads` et `/socket.io`).                                         |
+| Variable                    | Où       | Rôle                                                                                                               |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `MONGODB_URI`               | backend  | URI MongoDB. Si vide **et** `USE_IN_MEMORY_DB=true`, un MongoDB en mémoire est démarré (développement uniquement). |
+| `USE_IN_MEMORY_DB`          | backend  | Démarre un MongoDB en mémoire lorsque `MONGODB_URI` est vide.                                                      |
+| `JWT_SECRET`                | backend  | Secret de signature des jetons (16 caractères minimum). **Obligatoire.**                                           |
+| `CORS_ORIGIN`               | backend  | Origines autorisées, séparées par des virgules.                                                                    |
+| `PORT`                      | backend  | Port du backend (3000 par défaut dans `.env.example`).                                                             |
+| `PHOTO_MAX_SIZE_BYTES`      | backend  | Taille maximale d'une photo de profil (2097152 = 2 Mo par défaut).                                                 |
+| `PHOTO_STORAGE_DIR`         | backend  | Dossier de stockage des photos, relatif au dossier de travail du backend.                                          |
+| `REPORT_DETAILS_MAX_LENGTH` | backend  | Longueur maximale du descriptif d'un signalement (1000 par défaut).                                                |
+| `REPORT_RATE_LIMIT_MAX`     | backend  | Nombre maximal de signalements par fenêtre et par IP (5 par défaut).                                               |
+| `VITE_API_URL`              | frontend | URL de l'API appelée par le navigateur (vide = même origine).                                                      |
+| `VITE_API_PROXY_TARGET`     | frontend | Cible du proxy de développement Vite (`/api`, `/uploads` et `/socket.io`).                                         |
+| `VITE_STUN_URLS`            | frontend | Serveurs ICE de la négociation WebRTC, séparés par des virgules (`stun:stun.l.google.com:19302` par défaut).       |
 
 La liste complète est documentée dans `docs/architecture/.env.example`, `backend/.env.example`
 et `frontend/.env.example`.
@@ -103,7 +112,8 @@ $env:VITE_API_PROXY_TARGET="http://localhost:3100"; npm run dev:frontend
    « Discuter » pour démarrer une discussion directe.
 4. **Discussion** (`/chat`) — mise en relation aléatoire (file d'attente) ou session directe déjà
    initiée. Le partenaire est identifié par son pseudonyme, et par son nom/photo s'il les a
-   renseignés.
+   renseignés. Le bouton « Appeler » démarre un appel audiovisuel (le navigateur demande l'accès
+   au micro et à la caméra) ; le bouton « Signaler » ouvre le formulaire de signalement d'abus.
 
 ## API Sprint 2
 
@@ -117,6 +127,18 @@ $env:VITE_API_PROXY_TARGET="http://localhost:3100"; npm run dev:frontend
 
 Événement temps réel `chat:start` (`{ userId }`) : démarre une session avec un membre précis.
 La cible doit être connectée et libre, sinon l'erreur `USER_UNAVAILABLE` est renvoyée.
+
+## API Sprint 3
+
+| Méthode | Route             | Description                                                        |
+| ------- | ----------------- | ------------------------------------------------------------------ |
+| `POST`  | `/api/reports`    | Signalement d'abus du partenaire (`matchId`, `reason`, `details?`) |
+| `GET`   | `/api/reports/me` | Signalements émis par l'utilisateur courant (statut `pending`)     |
+
+Événements temps réel de signalisation : `media:request`, `media:accept`, `media:offer`,
+`media:answer`, `media:candidate`, `media:state`, `media:end` (client → serveur) et
+`media:request`, `media:accepted`, `media:offer`, `media:answer`, `media:candidate`, `media:state`,
+`media:ended` (serveur → client).
 
 Le détail des contrats se trouve dans `docs/architecture/api.md`.
 
@@ -148,8 +170,8 @@ i-keketa/
 │   ├── src/
 │   │   ├── config/       # variables d'environnement, journalisation
 │   │   ├── db/           # connexion MongoDB
-│   │   ├── models/       # User, Message, Match (Mongoose)
-│   │   ├── modules/      # auth, users, chat (routes / contrôleurs / services)
+│   │   ├── models/       # User, Message, Match, Report, CallSession (Mongoose)
+│   │   ├── modules/      # auth, users, chat, media, reports (routes / contrôleurs / services)
 │   │   ├── middleware/   # authentification, validation, upload, rate limiting, erreurs
 │   │   ├── realtime/     # serveur Socket.IO
 │   │   ├── schemas/      # schémas de validation Zod
@@ -160,7 +182,7 @@ i-keketa/
 │   ├── src/
 │   │   ├── components/   # composants d'interface réutilisables
 │   │   ├── context/      # contexte d'authentification
-│   │   ├── hooks/        # useAuth, useChatSocket
+│   │   ├── hooks/        # useAuth, useChatSocket, useMediaCall
 │   │   ├── lib/          # client API, socket, validation, stockage du jeton
 │   │   ├── pages/        # Connexion, Inscription, Chat, Profil, Découvrir
 │   │   └── styles/       # feuille de style globale

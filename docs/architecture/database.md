@@ -47,16 +47,40 @@ En développement, si `MONGODB_URI` est vide et `USE_IN_MEMORY_DB=true`, un Mong
 | `endedReason` | String | enum `user_skipped`/`partner_disconnected`/`user_disconnected` | Motif de clôture |
 | `createdAt` / `updatedAt` | Date | timestamps | Horodatage |
 
-### `reports` (Sprint 3)
+### `reports` (Sprint 3 — signalement d'abus)
 
-Entité prévue par le modèle logique, non implémentée dans le Sprint 1
-(champs attendus : signalé par, signalé, raison, statut).
+| Champ | Type | Contraintes | Description |
+|-------|------|-------------|-------------|
+| `_id` | ObjectId | — | Identifiant |
+| `reporterId` | ObjectId | ref `User`, required, index | Auteur du signalement |
+| `reportedId` | ObjectId | ref `User`, required, index | Utilisateur signalé (toujours l'autre participant) |
+| `matchId` | ObjectId | ref `Match`, required, index | Session de chat dans laquelle le comportement a été constaté |
+| `reason` | String | enum `harassment`/`inappropriate_content`/`nudity`/`spam`/`scam`/`other` | Motif |
+| `details` | String | trim, max 1000 | Description facultative |
+| `status` | String | enum `pending`, défaut `pending`, index | État du traitement (la modération n'est pas implémentée) |
+| `createdAt` / `updatedAt` | Date | timestamps | Horodatage |
+
+### `callsessions` (Sprint 3 — appels audiovisuels)
+
+| Champ | Type | Contraintes | Description |
+|-------|------|-------------|-------------|
+| `_id` | ObjectId | — | Identifiant |
+| `matchId` | ObjectId | ref `Match`, required, index | Session de chat |
+| `participants` | [ObjectId] | ref `User`, exactement 2 éléments | Les deux participants |
+| `status` | String | enum `pending`/`active`/`ended`, défaut `pending`, index | État de l'appel |
+| `audio` / `video` | Boolean | défaut `true` | Capacités demandées |
+| `startedAt` / `endedAt` | Date | — | Horodatage du début et de la fin |
+| `endedReason` | String | enum `hangup`/`partner_hangup`/`partner_disconnected`/`media_failed` | Motif de clôture |
+| `createdAt` / `updatedAt` | Date | timestamps | Horodatage |
+
+Les flux audio et vidéo ne sont **pas** stockés : seule la signalisation transite par le serveur.
 
 ## Relations
 
 - User 1..* Message (comme expéditeur ou destinataire)
 - User 1..* Match (participant, 2 par session)
-- User 1..* Report (auteur et cible) — Sprint 3
+- User 1..* Report (auteur et cible)
+- User 1..* CallSession (participant, 2 par appel)
 
 ## Contraintes
 
@@ -65,6 +89,9 @@ Entité prévue par le modèle logique, non implémentée dans le Sprint 1
 - Mot de passe hashé avec bcrypt (10 tours par défaut, `BCRYPT_SALT_ROUNDS`).
 - Validation des champs à l'entrée : schémas Zod côté API + contraintes Mongoose côté modèle.
 - Exactement 2 participants par session de chat (validateur de schéma).
+- Exactement 2 participants par session d'appel (validateur de schéma).
+- Un utilisateur ne signale qu'une fois son partenaire par session (index unique
+  `{ reporterId, matchId }`).
 
 ## Index
 
@@ -78,6 +105,10 @@ Entité prévue par le modèle logique, non implémentée dans le Sprint 1
 | `messages` | `{ matchId: 1, createdAt: 1 }` | Historique trié par date |
 | `matches` | `{ participants: 1, status: 1 }` | Sessions actives d'un utilisateur |
 | `matches` | `{ status: 1, createdAt: -1 }` | Sessions récentes |
+| `reports` | `{ reporterId: 1, matchId: 1 }` unique | Un seul signalement par auteur et par session |
+| `reports` | `{ reportedId: 1, createdAt: -1 }` | Signalements visant un utilisateur |
+| `callsessions` | `{ participants: 1, createdAt: -1 }` | Appels d'un utilisateur |
+| `callsessions` | `{ matchId: 1, status: 1 }` | Appels d'une session de chat |
 
 ## Migration
 

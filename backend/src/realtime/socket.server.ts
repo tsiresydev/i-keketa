@@ -6,6 +6,16 @@ import { verifyAccessToken } from '../utils/jwt';
 import { findUserById } from '../modules/auth/auth.service';
 import { messageContentSchema } from '../schemas/auth.schema';
 import { directChatSchema } from '../schemas/chat.schema';
+import {
+  mediaAcceptSchema,
+  mediaAnswerSchema,
+  mediaCandidateSchema,
+  mediaEndSchema,
+  mediaOfferSchema,
+  mediaRequestSchema,
+  mediaStateSchema,
+} from '../schemas/media.schema';
+import { MediaSignalingService } from '../modules/media/media-signaling.service';
 import { MatchmakingService, matchRoom } from '../modules/chat/matchmaking.service';
 import { saveMessage } from '../modules/chat/chat.service';
 import { sanitizeText } from '../utils/text';
@@ -67,6 +77,7 @@ const extractHandshakeToken = (socket: Socket): string | null => {
 export interface RealtimeServer {
   io: Server;
   matchmaking: MatchmakingService;
+  media: MediaSignalingService;
   close: () => Promise<void>;
 }
 
@@ -83,6 +94,12 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
   });
 
   const matchmaking = new MatchmakingService(io);
+  const mediaSignaling = new MediaSignalingService(io, matchmaking);
+
+  matchmaking.setOnMatchEnded((matchId) => {
+    void mediaSignaling.endCallForMatch(matchId, 'hangup');
+  });
+
   const messageRateLimiter = new SlidingWindowRateLimiter(
     env.WS_MESSAGE_RATE_MAX,
     env.WS_MESSAGE_RATE_WINDOW_MS,
@@ -156,6 +173,12 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
 
     socket.on('chat:skip', () => {
       runSafely(async () => {
+        const active = matchmaking.getActiveMatch(user.id);
+
+        if (active) {
+          await mediaSignaling.endCallForMatch(active.matchId, 'hangup');
+        }
+
         await matchmaking.endMatch(user.id, 'user_skipped');
         await matchmaking.joinQueue(socket);
       });
@@ -174,6 +197,135 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
         }
 
         await matchmaking.startDirectChat(socket, parsed.data.userId);
+      });
+    });
+
+    /* ---------- Signalisation des appels audiovisuels (WebRTC) ---------- */
+
+    socket.on('media:request', (payload: unknown) => {
+      runSafely(async () => {
+        const parsed = mediaRequestSchema.safeParse(payload);
+
+        if (!parsed.success) {
+          socket.emit('chat:error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Demande d’appel invalide.',
+          });
+          return;
+        }
+
+        await mediaSignaling.handleRequest(
+          socket,
+          parsed.data.matchId,
+          parsed.data.audio,
+          parsed.data.video,
+        );
+      });
+    });
+
+    socket.on('media:accept', (payload: unknown) => {
+      runSafely(async () => {
+        const parsed = mediaAcceptSchema.safeParse(payload);
+
+        if (!parsed.success) {
+          socket.emit('chat:error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Acceptation d’appel invalide.',
+          });
+          return;
+        }
+
+        await mediaSignaling.handleAccept(socket, parsed.data.matchId);
+      });
+    });
+
+    socket.on('media:offer', (payload: unknown) => {
+      runSafely(async () => {
+        const parsed = mediaOfferSchema.safeParse(payload);
+
+        if (!parsed.success) {
+          socket.emit('chat:error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Offre d’appel invalide.',
+          });
+          return;
+        }
+
+        mediaSignaling.relayDescription(
+          socket,
+          parsed.data.matchId,
+          parsed.data.description,
+          'media:offer',
+        );
+      });
+    });
+
+    socket.on('media:answer', (payload: unknown) => {
+      runSafely(async () => {
+        const parsed = mediaAnswerSchema.safeParse(payload);
+
+        if (!parsed.success) {
+          socket.emit('chat:error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Réponse d’appel invalide.',
+          });
+          return;
+        }
+
+        mediaSignaling.relayDescription(
+          socket,
+          parsed.data.matchId,
+          parsed.data.description,
+          'media:answer',
+        );
+      });
+    });
+
+    socket.on('media:candidate', (payload: unknown) => {
+      runSafely(async () => {
+        const parsed = mediaCandidateSchema.safeParse(payload);
+
+        if (!parsed.success) {
+          socket.emit('chat:error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Candidat ICE invalide.',
+          });
+          return;
+        }
+
+        mediaSignaling.relayCandidate(socket, parsed.data.matchId, parsed.data.candidate);
+      });
+    });
+
+    socket.on('media:state', (payload: unknown) => {
+      runSafely(async () => {
+        const parsed = mediaStateSchema.safeParse(payload);
+
+        if (!parsed.success) {
+          socket.emit('chat:error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'État des médias invalide.',
+          });
+          return;
+        }
+
+        mediaSignaling.relayState(socket, {
+          matchId: parsed.data.matchId,
+          audio: parsed.data.audio,
+          video: parsed.data.video,
+        });
+      });
+    });
+
+    socket.on('media:end', (payload: unknown) => {
+      runSafely(async () => {
+        const parsed = mediaEndSchema.safeParse(payload);
+
+        if (!parsed.success) {
+          return;
+        }
+
+        await mediaSignaling.handleEnd(socket, parsed.data.matchId, 'hangup');
       });
     });
 
@@ -242,13 +394,23 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
 
     socket.on('disconnect', () => {
       logger.info('Client temps réel déconnecté.', { userId: user.id });
-      runSafely(() => matchmaking.handleDisconnect(socket));
+      runSafely(async () => {
+        // L'appel doit être clôturé avant la fin de la session de chat.
+        const active = matchmaking.getActiveMatch(user.id);
+
+        if (active) {
+          await mediaSignaling.endCallForMatch(active.matchId, 'partner_disconnected');
+        }
+
+        await matchmaking.handleDisconnect(socket);
+      });
     });
   });
 
   return {
     io,
     matchmaking,
+    media: mediaSignaling,
     close: () =>
       new Promise<void>((resolve) => {
         io.close(() => resolve());

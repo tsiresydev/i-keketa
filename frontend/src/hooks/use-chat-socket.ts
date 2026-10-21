@@ -22,6 +22,8 @@ export interface ChatSocketState {
   messages: ChatMessage[];
   error: string | null;
   notice: string | null;
+  /** Socket temps réel partagé (utilisé par la signalisation audiovisuelle). */
+  socket: Socket | null;
 }
 
 export interface ChatSocketActions {
@@ -50,6 +52,7 @@ const initialState: ChatSocketState = {
   messages: [],
   error: null,
   notice: null,
+  socket: null,
 };
 
 export const useChatSocket = (token: string | null): ChatSocketState & ChatSocketActions => {
@@ -64,6 +67,8 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
 
     const socket = createChatSocket(token);
     socketRef.current = socket;
+
+    setState((previous) => ({ ...previous, socket }));
 
     socket.on('connect', () => {
       setState((previous) => ({ ...previous, connectionStatus: 'connected', error: null }));
@@ -162,6 +167,7 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
       socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
+      setState((previous) => ({ ...previous, socket: null }));
     };
   }, [token]);
 
