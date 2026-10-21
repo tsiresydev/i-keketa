@@ -1,6 +1,6 @@
 # Security — Plateforme de Chat
 
-Mesures appliquées dans les Sprints 1 et 2 et vérifiables dans `backend/src/` et `frontend/src/`.
+Mesures appliquées dans les Sprints 1, 2 et 3 et vérifiables dans `backend/src/` et `frontend/src/`.
 
 ## Secrets
 
@@ -59,8 +59,12 @@ Mesures appliquées dans les Sprints 1 et 2 et vérifiables dans `backend/src/` 
 
 - Journalisation serveur des événements sensibles (connexions, mise en relation, erreurs).
 - Pas de fuite d'informations sensibles dans les erreurs.
-- Le signalement et la modération arrivent au Sprint 3 : le modèle `Report` est prévu mais pas
-  encore implémenté.
+- Le signalement d'abus est implémenté : `POST /api/reports` (motif, descriptif facultatif) et
+  `GET /api/reports/me`. L'utilisateur signalé est toujours l'autre participant de la session,
+  dérivé côté serveur : un tiers ne peut pas désigner une autre personne, et un doublon par
+  session est refusé (`409`). Une limitation de débit dédiée s'applique (`REPORT_RATE_LIMIT_MAX`).
+- La **modération** (consultation, traitement, sanctions) n'est pas implémentée : les signalements
+  restent au statut `pending` et aucun outil de traitement n'est exposé.
 
 ## Anonymat
 
