@@ -6,7 +6,17 @@ import type { MediaCallStatus, MediaCallStatePayload } from '../types';
  * Serveurs STUN utilisés pour la négociation ICE.
  * Configurables via `VITE_STUN_URLS` (séparés par des virgules).
  */
-const DEFAULT_STUN_URL = 'stun:stun.l.google.com:19302';
+const DEFAULT_STUN_URL = 'stun:stun.relay.metered.ca:80';
+
+const DEFAULT_TURN_URLS = [
+  'turn:standard.relay.metered.ca:80',
+  'turn:standard.relay.metered.ca:80?transport=tcp',
+  'turn:standard.relay.metered.ca:443',
+  'turns:standard.relay.metered.ca:443?transport=tcp',
+].join(',');
+
+const DEFAULT_TURN_USERNAME = '9f5faa3eb6f40c8474a0a375';
+const DEFAULT_TURN_CREDENTIAL = 'XlJDLzKQHHj5xVEb';
 
 /**
  * Délai maximal pour établir la connexion pair-à-pair avant de proposer
@@ -15,7 +25,7 @@ const DEFAULT_STUN_URL = 'stun:stun.l.google.com:19302';
 const CONNECTION_TIMEOUT_MS = 30_000;
 
 const stunServers = (): RTCIceServer[] => {
-  const configured = (import.meta.env.VITE_STUN_URLS as string | undefined) ?? DEFAULT_STUN_URL;
+  const configured = (import.meta.env.VITE_STUN_URLS as string | undefined)?.trim() || DEFAULT_STUN_URL;
 
   const servers: RTCIceServer[] = configured
     .split(',')
@@ -23,9 +33,9 @@ const stunServers = (): RTCIceServer[] => {
     .filter(Boolean)
     .map((url) => ({ urls: url }));
 
-  const turnUrls = (import.meta.env.VITE_TURN_URLS as string | undefined)?.trim();
-  const turnUsername = (import.meta.env.VITE_TURN_USERNAME as string | undefined)?.trim();
-  const turnCredential = (import.meta.env.VITE_TURN_CREDENTIAL as string | undefined)?.trim();
+  const turnUrls = ((import.meta.env.VITE_TURN_URLS as string | undefined)?.trim() || DEFAULT_TURN_URLS);
+  const turnUsername = ((import.meta.env.VITE_TURN_USERNAME as string | undefined)?.trim() || DEFAULT_TURN_USERNAME);
+  const turnCredential = ((import.meta.env.VITE_TURN_CREDENTIAL as string | undefined)?.trim() || DEFAULT_TURN_CREDENTIAL);
 
   if (turnUrls) {
     const urls = turnUrls
