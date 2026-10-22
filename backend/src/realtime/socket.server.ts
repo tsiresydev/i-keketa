@@ -92,6 +92,10 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
   const matchmaking = new MatchmakingService(io);
   const mediaSignaling = new MediaSignalingService(io, matchmaking);
 
+  /** Nettoyages différés lors d'une déconnexion (tolérance aux coupures passagères). */
+  const pendingDisconnects = new Map<string, NodeJS.Timeout>();
+  const DISCONNECT_GRACE_MS = 8_000;
+
   matchmaking.setOnMatchEnded((matchId) => {
     void mediaSignaling.endCallForMatch(matchId, 'hangup');
   });
@@ -132,6 +136,14 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
     const user = socket.data.user as SocketUser;
 
     logger.info('Client temps réel connecté.', { userId: user.id });
+
+    // Reconnexion : annule un nettoyage en attente pour cet utilisateur.
+    const pending = pendingDisconnects.get(user.id);
+
+    if (pending) {
+      clearTimeout(pending);
+      pendingDisconnects.delete(user.id);
+    }
 
     matchmaking.registerSocket(socket);
 
@@ -371,16 +383,39 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
 
     socket.on('disconnect', () => {
       logger.info('Client temps réel déconnecté.', { userId: user.id });
-      runSafely(async () => {
-        // L'appel doit être clôturé avant la fin de la session de chat.
-        const active = matchmaking.getActiveMatch(user.id);
 
-        if (active) {
-          await mediaSignaling.endCallForMatch(active.matchId, 'partner_disconnected');
-        }
+      // Tolérance aux coupures passagères : le nettoyage n'est effectué qu'après
+      // un délai, annulé si l'utilisateur se reconnecte entre-temps.
+      const existing = pendingDisconnects.get(user.id);
 
-        await matchmaking.handleDisconnect(socket);
-      });
+      if (existing) {
+        clearTimeout(existing);
+      }
+
+      const timer = setTimeout(() => {
+        pendingDisconnects.delete(user.id);
+
+        runSafely(async () => {
+          // L'utilisateur s'est reconnecté entre-temps : on annule le nettoyage.
+          const currentSocket = matchmaking.getConnectedSocket(user.id);
+
+          if (currentSocket && currentSocket.id !== socket.id) {
+            logger.info('Reconnexion détectée, nettoyage annulé.', { userId: user.id });
+            return;
+          }
+
+          const active = matchmaking.getActiveMatch(user.id);
+
+          if (active) {
+            await mediaSignaling.endCallForMatch(active.matchId, 'partner_disconnected');
+          }
+
+          await matchmaking.handleDisconnect(socket);
+        });
+      }, DISCONNECT_GRACE_MS);
+
+      timer.unref();
+      pendingDisconnects.set(user.id, timer);
     });
   });
 

@@ -17,11 +17,32 @@ const CONNECTION_TIMEOUT_MS = 30_000;
 const stunServers = (): RTCIceServer[] => {
   const configured = (import.meta.env.VITE_STUN_URLS as string | undefined) ?? DEFAULT_STUN_URL;
 
-  return configured
+  const servers: RTCIceServer[] = configured
     .split(',')
     .map((url) => url.trim())
     .filter(Boolean)
     .map((url) => ({ urls: url }));
+
+  const turnUrls = (import.meta.env.VITE_TURN_URLS as string | undefined)?.trim();
+  const turnUsername = (import.meta.env.VITE_TURN_USERNAME as string | undefined)?.trim();
+  const turnCredential = (import.meta.env.VITE_TURN_CREDENTIAL as string | undefined)?.trim();
+
+  if (turnUrls) {
+    const urls = turnUrls
+      .split(',')
+      .map((url) => url.trim())
+      .filter(Boolean);
+
+    if (urls.length > 0) {
+      servers.push({
+        urls,
+        ...(turnUsername ? { username: turnUsername } : {}),
+        ...(turnCredential ? { credential: turnCredential } : {}),
+      });
+    }
+  }
+
+  return servers;
 };
 
 export interface MediaCallState {
@@ -119,6 +140,10 @@ export const useMediaCall = (
   const remoteDescriptionSetRef = useRef(false);
   /** Minuteur de connexion (annulé dès que l'appel est établi). */
   const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Minuteur de grâce lors d'une déconnexion passagère. */
+  const disconnectedGraceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Indique si une relance ICE a déjà été tentée pour cet appel. */
+  const iceRestartAttemptedRef = useRef(false);
 
   useEffect(() => {
     socketRef.current = socket;
@@ -158,21 +183,33 @@ export const useMediaCall = (
     }
   }, []);
 
+  /**
+   * Annule le minuteur de grâce lors d'une déconnexion passagère.
+   */
+  const clearDisconnectedGrace = useCallback((): void => {
+    if (disconnectedGraceRef.current) {
+      clearTimeout(disconnectedGraceRef.current);
+      disconnectedGraceRef.current = null;
+    }
+  }, []);
+
   const resetCall = useCallback(
     (nextState: Partial<MediaCallState> = {}) => {
       clearConnectionTimeout();
+      clearDisconnectedGrace();
       closePeer();
       pendingCandidatesRef.current = [];
       remoteDescriptionSetRef.current = false;
       isCallerRef.current = false;
       incomingCallRef.current = false;
+      iceRestartAttemptedRef.current = false;
 
       setState({
         ...initialState,
         ...nextState,
       });
     },
-    [clearConnectionTimeout, closePeer],
+    [clearConnectionTimeout, clearDisconnectedGrace, closePeer],
   );
 
   /**
@@ -261,20 +298,74 @@ export const useMediaCall = (
 
         if (peer.connectionState === 'connected') {
           clearConnectionTimeout();
+          clearDisconnectedGrace();
+          iceRestartAttemptedRef.current = false;
 
           setState((previous) => ({ ...previous, status: 'in-call' }));
           return;
         }
 
-        if (peer.connectionState === 'failed') {
-          resetCall({ error: 'La connexion à l’appel a échoué.' });
+        if (peer.connectionState === 'disconnected') {
+          // Interruption passagère : on laisse un délai de grâce avant de
+          // considérer l'appel comme perdu.
+          clearDisconnectedGrace();
+
+          disconnectedGraceRef.current = setTimeout(() => {
+            disconnectedGraceRef.current = null;
+
+            if (peerRef.current === peer && peer.connectionState !== 'connected') {
+              resetCall({ error: 'La connexion à l’appel a été perdue.' });
+            }
+          }, 10_000);
+
+          return;
         }
+
+        if (peer.connectionState === 'failed') {
+          clearDisconnectedGrace();
+
+          // Tentative unique de relance ICE avant d'abandonner.
+          if (!iceRestartAttemptedRef.current) {
+            iceRestartAttemptedRef.current = true;
+
+            try {
+              peer.restartIce();
+            } catch {
+              // restartIce peut ne pas être supporté : on abandonne alors.
+            }
+
+            // Si la relance n'aboutit pas, on clos l'appel.
+            setTimeout(() => {
+              if (peerRef.current === peer && peer.connectionState === 'failed') {
+                resetCall({ error: 'La connexion à l’appel a échoué.' });
+              }
+            }, 5_000);
+
+            return;
+          }
+
+          resetCall({ error: 'La connexion à l’appel a échoué.' });
+          return;
+        }
+
+        if (peer.connectionState === 'closed') {
+          resetCall();
+        }
+      };
+
+      peer.oniceconnectionstatechange = () => {
+        if (peerRef.current !== peer) {
+          return;
+        }
+
+        // Journalisation légère pour le diagnostic.
+        console.debug('[webrtc] iceConnectionState =', peer.iceConnectionState);
       };
 
       peerRef.current = peer;
       return peer;
     },
-    [clearConnectionTimeout, resetCall],
+    [clearConnectionTimeout, clearDisconnectedGrace, resetCall],
   );
 
   /**
