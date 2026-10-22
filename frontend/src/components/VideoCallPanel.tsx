@@ -10,6 +10,7 @@ export interface VideoCallPanelProps {
   facingMode?: 'user' | 'environment';
   partnerMedia: { audio: boolean; video: boolean };
   partnerName: string;
+  localDisplayName?: string;
   onAccept: () => void;
   onDecline: () => void;
   onEnd: () => void;
@@ -30,6 +31,7 @@ export const VideoCallPanel = ({
   facingMode = 'user',
   partnerMedia,
   partnerName,
+  localDisplayName = 'Vous',
   onAccept,
   onDecline,
   onEnd,
@@ -103,6 +105,7 @@ export const VideoCallPanel = ({
               <p className="call-stage__label">{partnerName}</p>
             </div>
           )}
+          <span className="call-tile__name">{partnerName}</span>
         </div>
 
         <div className="call-tile call-tile--local">
@@ -117,6 +120,7 @@ export const VideoCallPanel = ({
               Caméra off
             </span>
           ) : null}
+          <span className="call-tile__name">{localDisplayName}</span>
         </div>
       </div>
 

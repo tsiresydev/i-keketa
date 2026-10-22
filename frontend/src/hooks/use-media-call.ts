@@ -670,7 +670,7 @@ export const useMediaCall = (
         ...previous,
         status: 'requesting',
         error: null,
-        notice: options.automatic
+        notice: options.automatic && !(typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches)
           ? 'Appel vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
           : previous.notice,
       }));
@@ -727,7 +727,7 @@ export const useMediaCall = (
         ...previous,
         status: 'connecting',
         error: null,
-        notice: options.automatic
+        notice: options.automatic && !(typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches)
           ? 'Appel vidéo automatique : autorisez l’accès à la caméra et au micro pour être entendu et vu.'
           : previous.notice,
       }));

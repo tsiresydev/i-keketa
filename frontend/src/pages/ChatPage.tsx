@@ -250,7 +250,8 @@ export const ChatPage = () => {
               isCameraEnabled={isCameraEnabled}
               facingMode={facingMode}
               partnerMedia={partnerMedia}
-              partnerName={partnerName}
+               partnerName={partnerName}
+               localDisplayName={user?.displayName ?? 'Vous'}
               onAccept={() => void acceptCall()}
               onDecline={declineCall}
               onEnd={endCall}
