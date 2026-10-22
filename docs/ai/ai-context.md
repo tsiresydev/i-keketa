@@ -2,12 +2,12 @@
 
 ## Description du projet
 
-Plateforme web responsive de chat vidéo en ligne pour Madagascar, qui met en relation des inconnus
+Plateforme web responsive de chat vidéo en ligne pour Madagascar, qui met en relation des personnes
 de manière aléatoire. Accessible via site web optimisé pour mobiles. Développement en Vibe Coding (Opencode/Kilocode).
 
 ## Objectif et périmètre
 
-- **Objectif** : mettre en relation des inconnus de manière aléatoire pour discuter en vidéo, à
+- **Objectif** : mettre en relation des personnes de manière aléatoire pour discuter en vidéo, à
   Madagascar. Expérience fluide et intuitive, sécurité et confidentialité.
 - **Périmètre inclus** : session anonyme sans compte (aucun email ni mot de passe), chat aléatoire,
   messagerie texte temps réel, messagerie audiovisuelle, déploiement Vercel/Render.

@@ -147,6 +147,11 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
 
     matchmaking.registerSocket(socket);
 
+    socket.emit('presence:update', {
+      online: matchmaking.getOnlineCount(),
+      available: matchmaking.getAvailableCount(),
+    });
+
     socket.emit('queue:status', { status: 'idle' });
 
     /**

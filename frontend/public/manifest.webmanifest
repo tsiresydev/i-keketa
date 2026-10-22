@@ -1,7 +1,7 @@
 {
-  "name": "I-Keketa — Chat vidéo avec des inconnus",
+  "name": "I-Keketa — Chat vidéo avec des partenaires",
   "short_name": "I-Keketa",
-  "description": "Plateforme de chat vidéo qui met en relation des inconnus de manière aléatoire, à Madagascar.",
+  "description": "Plateforme de chat vidéo qui met en relation des personnes de manière aléatoire, à Madagascar.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0b0d12",

@@ -1,4 +1,5 @@
 ﻿import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Alert } from '../components/Alert';
 import { AppHeader } from '../components/AppHeader';
 import { ChatComposer } from '../components/ChatComposer';
@@ -10,6 +11,7 @@ import { useMediaCall } from '../hooks/use-media-call';
 
 export const ChatPage = () => {
   const { user, token } = useSession();
+  const location = useLocation();
   const messageListRef = useRef<HTMLUListElement>(null);
   const modalListRef = useRef<HTMLUListElement>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -23,6 +25,8 @@ export const ChatPage = () => {
     error,
     notice,
     socket,
+    onlineCount,
+    availableCount,
     joinQueue,
     leaveQueue,
     skipPartner,
@@ -96,6 +100,21 @@ export const ChatPage = () => {
     }
   }, [messages]);
 
+  // Lance automatiquement la recherche si la page est ouverte depuis l'accueil.
+  const autoSearch = (location.state as { autoSearch?: boolean } | null)?.autoSearch === true;
+
+  useEffect(() => {
+    if (!autoSearch) {
+      return;
+    }
+
+    if (chatStatus !== 'idle' || connectionStatus !== 'connected') {
+      return;
+    }
+
+    joinQueue();
+  }, [autoSearch, chatStatus, connectionStatus, joinQueue]);
+
   // Défile automatiquement vers le dernier message reçu (fenêtre modale).
   useEffect(() => {
     const list = modalListRef.current;
@@ -113,7 +132,11 @@ export const ChatPage = () => {
 
   return (
     <div className="app-shell chat-page">
-      <AppHeader connectionStatus={connectionStatus} />
+      <AppHeader
+        connectionStatus={connectionStatus}
+        onlineCount={onlineCount}
+        availableCount={availableCount}
+      />
 
       <main className="chat-main">
         {error ? (
@@ -268,7 +291,7 @@ export const ChatPage = () => {
         ) : chatStatus === 'waiting' ? (
           <section className="chat-panel" aria-live="polite">
             <div className="spinner" aria-hidden="true" />
-            <h2 className="chat-panel__title">Recherche d’un inconnu…</h2>
+            <h2 className="chat-panel__title">Recherche d’un partenaire…</h2>
             <p className="chat-panel__text">
               Vous serez mis en relation avec un autre utilisateur de la plateforme dès qu’un
               partenaire sera disponible.
@@ -293,7 +316,7 @@ export const ChatPage = () => {
                 onClick={joinQueue}
                 disabled={connectionStatus !== 'connected'}
               >
-                {connectionStatus === 'connected' ? 'Trouver un inconnu' : 'Connexion en cours…'}
+                {connectionStatus === 'connected' ? 'Trouver un partenaire' : 'Connexion en cours…'}
               </button>
             </div>
           </section>

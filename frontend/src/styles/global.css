@@ -956,3 +956,17 @@ a:focus-visible {
   flex: 1;
   min-width: 6rem;
 }
+
+.app-header__presence {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.home-page__presence {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}

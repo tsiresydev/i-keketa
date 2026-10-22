@@ -1,5 +1,5 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useSession } from '../hooks/use-session';
 import type { ConnectionStatus } from '../types';
 
@@ -7,25 +7,22 @@ export interface AppHeaderProps {
   /** Contenu additionnel affiché entre la navigation et l'état de connexion. */
   children?: ReactNode;
   connectionStatus?: ConnectionStatus;
+  onlineCount?: number;
+  availableCount?: number;
 }
 
 /**
- * En-tête commun : identité de l'utilisateur et déconnexion.
- * La navigation a été simplifiée : une seule page de discussion.
+ * En-tête commun : identité de l'utilisateur.
  */
-export const AppHeader = ({ children, connectionStatus }: AppHeaderProps) => {
-  const { user, logout } = useSession();
-  const navigate = useNavigate();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+export const AppHeader = ({
+  children,
+  connectionStatus,
+  onlineCount,
+  availableCount,
+}: AppHeaderProps) => {
+  const { user } = useSession();
 
   const displayName = user?.displayName ?? 'Invité';
-
-  const handleLogout = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    setIsLoggingOut(true);
-    logout();
-    navigate('/', { replace: true });
-  };
 
   return (
     <header className="app-header">
@@ -34,6 +31,15 @@ export const AppHeader = ({ children, connectionStatus }: AppHeaderProps) => {
       </Link>
 
       {children}
+
+      <span className="app-header__presence" aria-live="polite">
+        {typeof onlineCount === 'number'
+          ? `${onlineCount} personne${onlineCount > 1 ? 's' : ''} en ligne`
+          : null}
+        {typeof availableCount === 'number' && availableCount > 0
+          ? ` · ${availableCount} partenaire${availableCount > 1 ? 's' : ''} disponible${availableCount > 1 ? 's' : ''}`
+          : null}
+      </span>
 
       <div className="app-header__identity">
         <span className="avatar avatar--sm avatar--placeholder" aria-hidden="true">
@@ -53,12 +59,6 @@ export const AppHeader = ({ children, connectionStatus }: AppHeaderProps) => {
           ) : null}
         </span>
       </div>
-
-      <form onSubmit={handleLogout} className="app-header__logout">
-        <button type="submit" className="button button--ghost" disabled={isLoggingOut}>
-          Déconnexion
-        </button>
-      </form>
     </header>
   );
 };

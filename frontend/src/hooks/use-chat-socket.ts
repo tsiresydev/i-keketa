@@ -20,6 +20,8 @@ export interface ChatSocketState {
   messages: ChatMessage[];
   error: string | null;
   notice: string | null;
+  onlineCount: number;
+  availableCount: number;
   /** Socket temps réel partagé (utilisé par la signalisation audiovisuelle). */
   socket: Socket | null;
 }
@@ -56,6 +58,8 @@ const initialState: ChatSocketState = {
   messages: [],
   error: null,
   notice: null,
+  onlineCount: 0,
+  availableCount: 0,
   socket: null,
 };
 
@@ -77,6 +81,14 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
 
     socket.on('connect', () => {
       setState((previous) => ({ ...previous, connectionStatus: 'connected', error: null }));
+    });
+
+    socket.on('presence:update', (payload: { online: number; available: number }) => {
+      setState((previous) => ({
+        ...previous,
+        onlineCount: payload.online,
+        availableCount: payload.available,
+      }));
     });
 
     socket.on('disconnect', () => {
@@ -148,7 +160,9 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
     });
 
     socket.on('match:ended', (payload: MatchEndedPayload) => {
-      const autoRejoin = payload.reason === 'user_skipped' && !isSkippingRef.current;
+      const autoRejoin =
+        (payload.reason === 'user_skipped' && !isSkippingRef.current) ||
+        payload.reason === 'partner_disconnected';
 
       isSkippingRef.current = false;
 
@@ -159,7 +173,9 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
         partnerDisplayName: null,
         messages: [],
         notice: autoRejoin
-          ? 'Votre partenaire est passé à quelqu’un d’autre. Recherche d’un nouvel inconnu…'
+          ? payload.reason === 'partner_disconnected'
+            ? 'Votre partenaire s’est déconnecté. Recherche d’un nouveau partenaire…'
+            : 'Votre partenaire est passé à quelqu’un d’autre. Recherche d’un nouveau partenaire…'
           : (END_REASON_MESSAGES[payload.reason] ?? 'La discussion est terminée.'),
       }));
 

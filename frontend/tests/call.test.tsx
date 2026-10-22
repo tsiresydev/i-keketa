@@ -132,7 +132,7 @@ const enterSession = async (): Promise<void> => {
   const user = userEvent.setup();
   await renderChatPage();
 
-  await user.click(await screen.findByRole('button', { name: 'Trouver un inconnu' }));
+  await user.click(await screen.findByRole('button', { name: 'Trouver un partenaire' }));
   await deliver('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 };
 

@@ -81,6 +81,7 @@ export class MatchmakingService {
     }
 
     this.socketsByUser.set(user.id, socket);
+    this.broadcastPresence();
   }
 
   /**
@@ -95,6 +96,7 @@ export class MatchmakingService {
 
     if (this.socketsByUser.get(user.id)?.id === socket.id) {
       this.socketsByUser.delete(user.id);
+      this.broadcastPresence();
     }
   }
 
@@ -137,10 +139,12 @@ export class MatchmakingService {
       });
       socket.emit('queue:status', { status: 'waiting', position: this.waiting.length });
       logger.info('Utilisateur en attente de partenaire.', { userId: user.id });
+      this.broadcastPresence();
       return;
     }
 
     await this.createMatch(socket, partner);
+    this.broadcastPresence();
   }
 
   /**
@@ -151,6 +155,7 @@ export class MatchmakingService {
 
     if (index >= 0) {
       this.waiting.splice(index, 1);
+      this.broadcastPresence();
     }
   }
 
@@ -185,6 +190,8 @@ export class MatchmakingService {
 
     this.io.to(matchRoom(matchId)).emit('match:ended', { matchId, reason });
 
+    this.broadcastPresence();
+
     this.onMatchEnded?.(matchId);
   }
 
@@ -213,6 +220,8 @@ export class MatchmakingService {
     if (wasWaiting) {
       logger.info('Utilisateur déconnecté de la file d’attente.', { userId: user.id });
     }
+
+    this.broadcastPresence();
   }
 
   /**
@@ -220,6 +229,36 @@ export class MatchmakingService {
    */
   getQueueSize(): number {
     return this.waiting.length;
+  }
+
+  /**
+   * Nombre d'utilisateurs actuellement connectés (source de vérité).
+   */
+  getOnlineCount(): number {
+    return this.socketsByUser.size;
+  }
+
+  /**
+   * Nombre de partenaires disponibles pour un nouveau chat : utilisateurs
+   * connectés qui ne sont pas déjà dans une conversation active.
+   */
+  getAvailableCount(): number {
+    const busy = this.activeMatches.size * 2;
+
+    return Math.max(0, this.socketsByUser.size - busy);
+  }
+
+  /**
+   * Diffuse le nombre d'utilisateurs en ligne et de partenaires disponibles
+   * à tous les clients connectés.
+   */
+  broadcastPresence(): void {
+    const payload = {
+      online: this.getOnlineCount(),
+      available: this.getAvailableCount(),
+    };
+
+    this.io.emit('presence:update', payload);
   }
 
   /**

@@ -1,6 +1,6 @@
 # I-Keketa
 
-I-Keketa est l'une des plateformes de chat vidéo en ligne qui mettent en relation des inconnus de
+I-Keketa est l'une des plateformes de chat vidéo en ligne qui mettent en relation des personnes de
 manière aléatoire, à Madagascar : rencontres et échanges **anonymes**, via une interface web
 responsive pensée pour le mobile.
 

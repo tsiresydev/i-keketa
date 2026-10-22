@@ -166,17 +166,19 @@ describe('Page de chat', () => {
     vi.stubGlobal('RTCPeerConnection', FakePeerConnection);
   });
 
-  it('propose de trouver un inconnu au démarrage', async () => {
+  it('propose de Trouver un partenaire au démarrage', async () => {
     await renderChatPage();
 
-    expect(await screen.findByRole('button', { name: 'Trouver un inconnu' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Trouver un partenaire' }),
+    ).toBeInTheDocument();
   });
 
   it('rejoint la file d’attente et affiche l’état d’attente', async () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver un inconnu' }));
+    await user.click(await screen.findByRole('button', { name: 'Trouver un partenaire' }));
 
     await waitFor(() => {
       expect(fakeSocket.emitted.some((entry) => entry.event === 'queue:join')).toBe(true);
@@ -184,14 +186,14 @@ describe('Page de chat', () => {
 
     await emit('queue:status', { status: 'waiting', position: 1 });
 
-    expect(await screen.findByText('Recherche d’un inconnu…')).toBeInTheDocument();
+    expect(await screen.findByText('Recherche d’un partenaire…')).toBeInTheDocument();
   });
 
   it('affiche le partenaire et permet d’envoyer un message', async () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver un inconnu' }));
+    await user.click(await screen.findByRole('button', { name: 'Trouver un partenaire' }));
 
     await emit('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 
@@ -223,7 +225,7 @@ describe('Page de chat', () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver un inconnu' }));
+    await user.click(await screen.findByRole('button', { name: 'Trouver un partenaire' }));
     await emit('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 
     await emit('chat:message', {
@@ -243,7 +245,7 @@ describe('Page de chat', () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver un inconnu' }));
+    await user.click(await screen.findByRole('button', { name: 'Trouver un partenaire' }));
 
     await emit('chat:error', {
       code: 'RATE_LIMITED',
@@ -259,7 +261,7 @@ describe('Page de chat', () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver un inconnu' }));
+    await user.click(await screen.findByRole('button', { name: 'Trouver un partenaire' }));
     await emit('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 
     await user.click(screen.getByRole('button', { name: 'Passer à quelqu’un d’autre' }));
@@ -273,7 +275,7 @@ describe('Page de chat', () => {
     const user = userEvent.setup();
     await renderChatPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Trouver un inconnu' }));
+    await user.click(await screen.findByRole('button', { name: 'Trouver un partenaire' }));
     await emit('match:found', { matchId: 'match-1', partner: { displayName: 'Miora' } });
 
     expect(await screen.findByText('Miora')).toBeInTheDocument();

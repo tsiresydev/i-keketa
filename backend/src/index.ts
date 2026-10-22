@@ -18,6 +18,24 @@ const start = async (): Promise<void> => {
   const httpServer = createServer(app);
   const realtime = createRealtimeServer(httpServer);
 
+  // Expose le service de matchmaking pour la présence (compteur en ligne).
+  app.locals.matchmaking = realtime.matchmaking;
+
+  app.get('/api/presence', (_req, res) => {
+    const matchmaking = app.locals.matchmaking as
+      { getOnlineCount: () => number; getAvailableCount: () => number } | undefined;
+
+    if (!matchmaking) {
+      res.status(200).json({ online: 0, available: 0 });
+      return;
+    }
+
+    res.status(200).json({
+      online: matchmaking.getOnlineCount(),
+      available: matchmaking.getAvailableCount(),
+    });
+  });
+
   httpServer.listen(env.PORT, () => {
     logger.info('Serveur I-Keketa démarré.', {
       port: env.PORT,
