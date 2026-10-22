@@ -50,6 +50,7 @@ export const ChatPage = () => {
     endCall,
     toggleMicrophone,
     toggleCamera,
+    switchCamera,
     clearError: clearCallError,
     clearNotice: clearCallNotice,
   } = useMediaCall(socket, matchId);
@@ -258,6 +259,7 @@ export const ChatPage = () => {
               onEnd={endCall}
               onToggleMicrophone={toggleMicrophone}
               onToggleCamera={toggleCamera}
+              onSwitchCamera={switchCamera}
             />
 
             {!isInCall ? (

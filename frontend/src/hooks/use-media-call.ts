@@ -70,6 +70,7 @@ export interface MediaCallActions {
   endCall: () => void;
   toggleMicrophone: () => void;
   toggleCamera: () => void;
+  switchCamera: () => Promise<void>;
   clearError: () => void;
   clearNotice: () => void;
 }
@@ -131,6 +132,8 @@ export const useMediaCall = (
   const matchIdRef = useRef<string | null>(matchId);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  /** Sens de la caméra actuellement utilisée. */
+  const facingModeRef = useRef<'user' | 'environment'>('user');
   /** Vrai tant que l'utilisateur doit encore émettre l'offre (il est l'appelant). */
   const isCallerRef = useRef(false);
   /** Vrai tant qu'un appel entrant n'a pas été traité (l'utilisateur est l'appelé). */
@@ -815,6 +818,68 @@ export const useMediaCall = (
     });
   }, []);
 
+  const switchCamera = useCallback(async (): Promise<void> => {
+    const localStream = localStreamRef.current;
+
+    if (!localStream || !navigator.mediaDevices?.getUserMedia) {
+      return;
+    }
+
+    const nextMode: 'user' | 'environment' =
+      facingModeRef.current === 'user' ? 'environment' : 'user';
+
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: nextMode },
+      });
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+
+      if (!newVideoTrack) {
+        newStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      const peer = peerRef.current;
+
+      if (peer) {
+        const sender = peer.getSenders().find((current) => current.track?.kind === 'video');
+
+        if (sender) {
+          await sender.replaceTrack(newVideoTrack);
+        }
+      }
+
+      const previousVideoTrack = localStream.getVideoTracks()[0];
+
+      if (previousVideoTrack) {
+        localStream.removeTrack(previousVideoTrack);
+        previousVideoTrack.stop();
+      }
+
+      localStream.addTrack(newVideoTrack);
+
+      newStream.getTracks().forEach((track) => {
+        if (track !== newVideoTrack) {
+          track.stop();
+        }
+      });
+
+      facingModeRef.current = nextMode;
+
+      setState((previous) => ({
+        ...previous,
+        localStream,
+        isCameraEnabled: newVideoTrack.enabled,
+      }));
+    } catch (error) {
+      setState((previous) => ({
+        ...previous,
+        error: describeMediaError(error),
+      }));
+    }
+  }, []);
+
   const clearError = useCallback(() => {
     setState((previous) => ({ ...previous, error: null }));
   }, []);
@@ -831,6 +896,7 @@ export const useMediaCall = (
     endCall,
     toggleMicrophone,
     toggleCamera,
+    switchCamera,
     clearError,
     clearNotice,
   };

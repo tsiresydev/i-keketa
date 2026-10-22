@@ -14,6 +14,7 @@ export interface VideoCallPanelProps {
   onEnd: () => void;
   onToggleMicrophone: () => void;
   onToggleCamera: () => void;
+  onSwitchCamera?: () => void;
 }
 
 /**
@@ -33,6 +34,7 @@ export const VideoCallPanel = ({
   onEnd,
   onToggleMicrophone,
   onToggleCamera,
+  onSwitchCamera,
 }: VideoCallPanelProps) => {
   if (status === 'idle') {
     return null;
@@ -139,6 +141,15 @@ export const VideoCallPanel = ({
           title={isCameraEnabled ? 'Couper la caméra' : 'Activer la caméra'}
         >
           {isCameraEnabled ? '📹 Caméra' : '🚫 Caméra coupée'}
+        </button>
+
+        <button
+          type="button"
+          className="call-control"
+          onClick={() => void onSwitchCamera?.()}
+          title="Changer de caméra"
+        >
+          🔄 Caméra
         </button>
 
         <button
