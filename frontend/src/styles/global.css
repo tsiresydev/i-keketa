@@ -1073,3 +1073,8 @@ a:focus-visible {
     margin-left: 0;
   }
 }
+@media (max-width: 767px) {
+  .partner-bar { display: none; }
+  .call-control__label { display: none; }
+  .call-control { padding: var(--space-2); min-width: 2.75rem; justify-content: center; }
+}

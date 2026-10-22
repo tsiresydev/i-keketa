@@ -135,8 +135,14 @@ export const VideoCallPanel = ({
           onClick={onToggleMicrophone}
           aria-pressed={isMicrophoneEnabled}
           title={isMicrophoneEnabled ? 'Couper le micro' : 'Activer le micro'}
+          aria-label={isMicrophoneEnabled ? 'Couper le micro' : 'Activer le micro'}
         >
-          {isMicrophoneEnabled ? 'ðŸŽ™ Micro' : 'ðŸ”‡ Micro coupé'}
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+          <span className="call-control__label">{isMicrophoneEnabled ? 'Micro' : 'Micro coupé'}</span>
         </button>
 
         <button
@@ -151,12 +157,25 @@ export const VideoCallPanel = ({
                 : 'Désactiver la caméra'
               : 'Activer la caméra'
           }
+          aria-label={
+            isCameraEnabled
+              ? facingMode === 'user'
+                ? 'Passer à la caméra dorsale'
+                : 'Désactiver la caméra'
+              : 'Activer la caméra'
+          }
         >
-          {isCameraEnabled
-            ? facingMode === 'user'
-              ? 'ðŸ“¹ Caméra (frontale)'
-              : 'ðŸ“¹ Caméra (dorsale)'
-            : 'ðŸš« Caméra coupée'}
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M23 7 16 12 23 17V7z" />
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+          </svg>
+          <span className="call-control__label">
+            {isCameraEnabled
+              ? facingMode === 'user'
+                ? 'Caméra (frontale)'
+                : 'Caméra (dorsale)'
+              : 'Caméra coupée'}
+          </span>
         </button>
 
         <button
@@ -164,8 +183,12 @@ export const VideoCallPanel = ({
           className="call-control call-control--hangup"
           onClick={onEnd}
           title="Raccrocher"
+          aria-label="Raccrocher"
         >
-          Raccrocher
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67 19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
+          </svg>
+          <span className="call-control__label">Raccrocher</span>
         </button>
       </div>
     </section>
