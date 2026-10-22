@@ -81,7 +81,7 @@ export const HomePage = () => {
     };
 
     void fetchPresence();
-    const interval = window.setInterval(() => void fetchPresence(), 5000);
+    const interval = window.setInterval(() => void fetchPresence(), 2000);
 
     return () => {
       cancelled = true;

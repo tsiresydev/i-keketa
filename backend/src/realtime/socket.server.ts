@@ -389,6 +389,10 @@ export const createRealtimeServer = (httpServer: HttpServer): RealtimeServer => 
     socket.on('disconnect', () => {
       logger.info('Client temps réel déconnecté.', { userId: user.id });
 
+      // Mise à jour immédiate de la présence (le nettoyage de la session reste différé).
+      matchmaking.unregisterSocket(socket);
+      matchmaking.broadcastPresence();
+
       // Tolérance aux coupures passagères : le nettoyage n'est effectué qu'après
       // un délai, annulé si l'utilisateur se reconnecte entre-temps.
       const existing = pendingDisconnects.get(user.id);
