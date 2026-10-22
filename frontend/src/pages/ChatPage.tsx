@@ -25,8 +25,6 @@ export const ChatPage = () => {
     error,
     notice,
     socket,
-    onlineCount,
-    availableCount,
     joinQueue,
     leaveQueue,
     skipPartner,
@@ -135,8 +133,6 @@ export const ChatPage = () => {
     <div className="app-shell chat-page">
       <AppHeader
         connectionStatus={connectionStatus}
-        onlineCount={onlineCount}
-        availableCount={availableCount}
       />
 
       <main className="chat-main">

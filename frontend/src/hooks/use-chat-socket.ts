@@ -20,8 +20,6 @@ export interface ChatSocketState {
   messages: ChatMessage[];
   error: string | null;
   notice: string | null;
-  onlineCount: number;
-  availableCount: number;
   /** Socket temps réel partagé (utilisé par la signalisation audiovisuelle). */
   socket: Socket | null;
 }
@@ -58,8 +56,6 @@ const initialState: ChatSocketState = {
   messages: [],
   error: null,
   notice: null,
-  onlineCount: 0,
-  availableCount: 0,
   socket: null,
 };
 
@@ -81,14 +77,6 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
 
     socket.on('connect', () => {
       setState((previous) => ({ ...previous, connectionStatus: 'connected', error: null }));
-    });
-
-    socket.on('presence:update', (payload: { online: number; available: number }) => {
-      setState((previous) => ({
-        ...previous,
-        onlineCount: payload.online,
-        availableCount: payload.available,
-      }));
     });
 
     socket.on('disconnect', () => {

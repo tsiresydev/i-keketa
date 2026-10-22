@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Alert } from '../components/Alert';
 import { FormField } from '../components/FormField';
 import { isSessionError, useSession } from '../hooks/use-session';
-import { API_BASE_URL } from '../lib/api-client';
 import { validateSessionDisplayName } from '../lib/validation';
 
 /**
@@ -51,43 +50,6 @@ export const HomePage = () => {
   const [fieldError, setFieldError] = useState<string | undefined>(undefined);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [onlineCount, setOnlineCount] = useState<number | null>(null);
-  const [availableCount, setAvailableCount] = useState<number | null>(null);
-
-  // Interroge le compteur d'utilisateurs en ligne (la page d'accueil n'a pas
-  // de socket temps réel).
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchPresence = async (): Promise<void> => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/presence`);
-
-        if (!response.ok) {
-          return;
-        }
-
-        const data = (await response.json()) as { online: number; available: number };
-
-        if (cancelled) {
-          return;
-        }
-
-        setOnlineCount(data.online);
-        setAvailableCount(data.available);
-      } catch {
-        // Réseau indisponible : on garde la dernière valeur connue.
-      }
-    };
-
-    void fetchPresence();
-    const interval = window.setInterval(() => void fetchPresence(), 2000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -125,14 +87,6 @@ export const HomePage = () => {
           échangez en visio. Aucun compte, aucun mot de passe. L'accès à la caméra et au micro vous
           sera demandé à l'ouverture.
         </p>
-        {onlineCount !== null ? (
-          <p className="home-page__presence" aria-live="polite">
-            {onlineCount} personne{onlineCount > 1 ? 's' : ''} en ligne
-            {availableCount !== null && availableCount > 0
-              ? ` · ${availableCount} partenaire${availableCount > 1 ? 's' : ''} disponible${availableCount > 1 ? 's' : ''}`
-              : null}
-          </p>
-        ) : null}
       </section>
 
       <form onSubmit={handleSubmit} className="home-page__form" noValidate>
