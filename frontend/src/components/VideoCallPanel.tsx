@@ -7,14 +7,14 @@ export interface VideoCallPanelProps {
   remoteStream: MediaStream | null;
   isMicrophoneEnabled: boolean;
   isCameraEnabled: boolean;
+  facingMode?: 'user' | 'environment';
   partnerMedia: { audio: boolean; video: boolean };
   partnerName: string;
   onAccept: () => void;
   onDecline: () => void;
   onEnd: () => void;
   onToggleMicrophone: () => void;
-  onToggleCamera: () => void;
-  onSwitchCamera?: () => void;
+  onCycleCamera: () => void;
 }
 
 /**
@@ -27,14 +27,14 @@ export const VideoCallPanel = ({
   remoteStream,
   isMicrophoneEnabled,
   isCameraEnabled,
+  facingMode = 'user',
   partnerMedia,
   partnerName,
   onAccept,
   onDecline,
   onEnd,
   onToggleMicrophone,
-  onToggleCamera,
-  onSwitchCamera,
+  onCycleCamera,
 }: VideoCallPanelProps) => {
   if (status === 'idle') {
     return null;
@@ -136,20 +136,21 @@ export const VideoCallPanel = ({
         <button
           type="button"
           className={`call-control ${isCameraEnabled ? '' : 'call-control--off'}`}
-          onClick={onToggleCamera}
+          onClick={() => void onCycleCamera()}
           aria-pressed={isCameraEnabled}
-          title={isCameraEnabled ? 'Couper la caméra' : 'Activer la caméra'}
+          title={
+            isCameraEnabled
+              ? facingMode === 'user'
+                ? 'Passer à la caméra dorsale'
+                : 'Désactiver la caméra'
+              : 'Activer la caméra'
+          }
         >
-          {isCameraEnabled ? '📹 Caméra' : '🚫 Caméra coupée'}
-        </button>
-
-        <button
-          type="button"
-          className="call-control"
-          onClick={() => void onSwitchCamera?.()}
-          title="Changer de caméra"
-        >
-          🔄 Caméra
+          {isCameraEnabled
+            ? facingMode === 'user'
+              ? '📹 Caméra (frontale)'
+              : '📹 Caméra (dorsale)'
+            : '🚫 Caméra coupée'}
         </button>
 
         <button

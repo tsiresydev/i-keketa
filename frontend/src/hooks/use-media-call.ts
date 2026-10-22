@@ -51,6 +51,8 @@ export interface MediaCallState {
   remoteStream: MediaStream | null;
   isMicrophoneEnabled: boolean;
   isCameraEnabled: boolean;
+  /** Sens de la caméra actuellement utilisée. */
+  facingMode: 'user' | 'environment';
   /** Micro et caméra du partenaire (tels qu'il les déclare). */
   partnerMedia: { audio: boolean; video: boolean };
   error: string | null;
@@ -71,6 +73,7 @@ export interface MediaCallActions {
   toggleMicrophone: () => void;
   toggleCamera: () => void;
   switchCamera: () => Promise<void>;
+  cycleCamera: () => Promise<void>;
   clearError: () => void;
   clearNotice: () => void;
 }
@@ -81,6 +84,7 @@ const initialState: MediaCallState = {
   remoteStream: null,
   isMicrophoneEnabled: true,
   isCameraEnabled: true,
+  facingMode: 'user',
   partnerMedia: { audio: true, video: true },
   error: null,
   notice: null,
@@ -871,6 +875,7 @@ export const useMediaCall = (
         ...previous,
         localStream,
         isCameraEnabled: newVideoTrack.enabled,
+        facingMode: nextMode,
       }));
     } catch (error) {
       setState((previous) => ({
@@ -879,6 +884,104 @@ export const useMediaCall = (
       }));
     }
   }, []);
+
+  const cycleCamera = useCallback(async (): Promise<void> => {
+    const localStream = localStreamRef.current;
+
+    if (!localStream) {
+      return;
+    }
+
+    const videoTrack = localStream.getVideoTracks()[0];
+    const isOn = Boolean(videoTrack && videoTrack.enabled);
+
+    // Caméra désactivée : on l'active sur le sens courant.
+    if (!isOn) {
+      if (videoTrack) {
+        videoTrack.enabled = true;
+
+        setState((previous) => ({ ...previous, isCameraEnabled: true }));
+
+        const currentMatchId = matchIdRef.current;
+
+        if (currentMatchId) {
+          socketRef.current?.emit('media:state', {
+            matchId: currentMatchId,
+            audio: localStream.getAudioTracks().some((track) => track.enabled),
+            video: true,
+          });
+        }
+
+        return;
+      }
+
+      // Aucune piste vidéo : on acquiert la caméra frontale.
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facingModeRef.current },
+        });
+
+        const newVideoTrack = newStream.getVideoTracks()[0];
+
+        if (!newVideoTrack) {
+          newStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        const peer = peerRef.current;
+
+        if (peer) {
+          const sender = peer.getSenders().find((current) => current.track?.kind === 'video');
+
+          if (sender) {
+            await sender.replaceTrack(newVideoTrack);
+          }
+        }
+
+        localStream.addTrack(newVideoTrack);
+
+        newStream.getTracks().forEach((track) => {
+          if (track !== newVideoTrack) {
+            track.stop();
+          }
+        });
+
+        setState((previous) => ({
+          ...previous,
+          localStream,
+          isCameraEnabled: true,
+          facingMode: facingModeRef.current,
+        }));
+      } catch (error) {
+        setState((previous) => ({ ...previous, error: describeMediaError(error) }));
+      }
+
+      return;
+    }
+
+    // Caméra active sur le front : on passe au dorsal.
+    if (facingModeRef.current === 'user') {
+      await switchCamera();
+      return;
+    }
+
+    // Caméra active sur le dorsal : on désactive.
+    if (videoTrack) {
+      videoTrack.enabled = false;
+
+      setState((previous) => ({ ...previous, isCameraEnabled: false }));
+
+      const currentMatchId = matchIdRef.current;
+
+      if (currentMatchId) {
+        socketRef.current?.emit('media:state', {
+          matchId: currentMatchId,
+          audio: localStream.getAudioTracks().some((track) => track.enabled),
+          video: false,
+        });
+      }
+    }
+  }, [switchCamera]);
 
   const clearError = useCallback(() => {
     setState((previous) => ({ ...previous, error: null }));
@@ -897,6 +1000,7 @@ export const useMediaCall = (
     toggleMicrophone,
     toggleCamera,
     switchCamera,
+    cycleCamera,
     clearError,
     clearNotice,
   };
