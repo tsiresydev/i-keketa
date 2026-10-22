@@ -543,7 +543,7 @@ a:focus-visible {
   flex-direction: column;
   gap: var(--space-4);
   padding: var(--space-4);
-  overflow: auto;
+  overflow: hidden;
   min-height: 0;
 }
 
@@ -642,7 +642,11 @@ a:focus-visible {
 .call-panel--live {
   padding: var(--space-4);
   max-width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
+  overflow: hidden;
 }
 
 .call-panel__title {
@@ -668,24 +672,33 @@ a:focus-visible {
 }
 
 .call-stage {
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   width: 100%;
-  aspect-ratio: 16 / 9;
+  flex: 1;
+  min-height: 0;
+}
+
+.call-tile {
+  position: relative;
   background: #000;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: var(--shadow-lg);
   border: 1px solid var(--color-border);
+  flex: 1;
+  min-height: 0;
+  box-shadow: var(--shadow-md);
 }
 
-.call-stage__remote {
+.call-tile__video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.call-stage__placeholder {
+.call-tile__placeholder {
   width: 100%;
   height: 100%;
   display: flex;
@@ -697,33 +710,7 @@ a:focus-visible {
   color: var(--color-text-muted);
 }
 
-.call-stage__label {
-  font-size: var(--font-size-lg);
-  color: var(--color-text-soft);
-}
-
-.call-stage__local {
-  position: absolute;
-  bottom: var(--space-3);
-  right: var(--space-3);
-  width: 28%;
-  max-width: 180px;
-  aspect-ratio: 4 / 3;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  box-shadow: var(--shadow-md);
-  background: #000;
-}
-
-.call-stage__local-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.call-stage__local-off {
+.call-tile__off {
   position: absolute;
   inset: 0;
   display: flex;
@@ -732,6 +719,17 @@ a:focus-visible {
   background: rgba(0, 0, 0, 0.6);
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
+}
+
+.call-stage__label {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-soft);
+}
+
+@media (min-width: 768px) {
+  .call-stage {
+    flex-direction: row;
+  }
 }
 
 .call-controls {

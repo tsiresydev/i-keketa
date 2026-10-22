@@ -88,30 +88,32 @@ export const VideoCallPanel = ({
   return (
     <section className="call-panel call-panel--live" aria-label="Appel en cours">
       <div className="call-stage">
-        {remoteStream ? (
-          <VideoStream
-            stream={remoteStream}
-            className="call-stage__remote"
-            label={`Vidéo de ${partnerName}`}
-          />
-        ) : (
-          <div className="call-stage__placeholder">
-            <span className="avatar avatar--lg avatar--placeholder" aria-hidden="true">
-              {partnerName.slice(0, 1).toUpperCase()}
-            </span>
-            <p className="call-stage__label">{partnerName}</p>
-          </div>
-        )}
+        <div className="call-tile call-tile--remote">
+          {remoteStream ? (
+            <VideoStream
+              stream={remoteStream}
+              className="call-tile__video"
+              label={`Vidéo de ${partnerName}`}
+            />
+          ) : (
+            <div className="call-tile__placeholder">
+              <span className="avatar avatar--lg avatar--placeholder" aria-hidden="true">
+                {partnerName.slice(0, 1).toUpperCase()}
+              </span>
+              <p className="call-stage__label">{partnerName}</p>
+            </div>
+          )}
+        </div>
 
-        <div className="call-stage__local">
+        <div className="call-tile call-tile--local">
           <VideoStream
             stream={localStream}
             muted
-            className="call-stage__local-video"
+            className="call-tile__video"
             label="Votre vidéo"
           />
           {!isCameraEnabled ? (
-            <span className="call-stage__local-off" aria-hidden="true">
+            <span className="call-tile__off" aria-hidden="true">
               Caméra off
             </span>
           ) : null}
@@ -130,7 +132,7 @@ export const VideoCallPanel = ({
           aria-pressed={isMicrophoneEnabled}
           title={isMicrophoneEnabled ? 'Couper le micro' : 'Activer le micro'}
         >
-          {isMicrophoneEnabled ? '🎙 Micro' : '🔇 Micro coupé'}
+          {isMicrophoneEnabled ? 'ðŸŽ™ Micro' : 'ðŸ”‡ Micro coupé'}
         </button>
 
         <button
@@ -148,9 +150,9 @@ export const VideoCallPanel = ({
         >
           {isCameraEnabled
             ? facingMode === 'user'
-              ? '📹 Caméra (frontale)'
-              : '📹 Caméra (dorsale)'
-            : '🚫 Caméra coupée'}
+              ? 'ðŸ“¹ Caméra (frontale)'
+              : 'ðŸ“¹ Caméra (dorsale)'
+            : 'ðŸš« Caméra coupée'}
         </button>
 
         <button
