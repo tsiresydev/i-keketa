@@ -329,6 +329,21 @@ export const ChatPage = () => {
           </button>
         </footer>
       ) : null}
+
+      {isMatched && !isCallActive ? (
+        <button
+          type="button"
+          className="call-launch-fab"
+          onClick={() => void startCall()}
+          aria-label="Lancer l’appel vidéo"
+          title="Lancer l’appel vidéo"
+        >
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M23 7 16 12 23 17V7z" />
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+          </svg>
+        </button>
+      ) : null}
     </div>
   );
 };
