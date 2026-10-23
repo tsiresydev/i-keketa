@@ -81,8 +81,12 @@ export const ChatPage = () => {
     void startCall({ automatic: true });
   }, [matchId, connectionStatus, startCall]);
 
-  // L'appel entrant est accepté automatiquement : la conversation vidéo
-  // démarre sans action supplémentaire de l'utilisateur.
+  // Réinitialise l'appel dès que la session de chat n'est plus active.
+  useEffect(() => {
+    if (chatStatus !== 'matched' && callStatus !== 'idle') {
+      endCall();
+    }
+  }, [chatStatus, callStatus, endCall]);
   useEffect(() => {
     if (callStatus !== 'ringing') {
       autoAcceptMatchRef.current = null;
