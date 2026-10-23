@@ -175,9 +175,6 @@ export class MatchmakingService {
     this.leaveQueue(active.partnerId);
 
     const matchId = active.matchId;
-    const partnerSocketId = active.partnerSocketId;
-
-    // Capture joining user's socket? We don't have it here, but partner socket id known.
 
     try {
       await MatchModel.updateOne(
@@ -192,9 +189,6 @@ export class MatchmakingService {
     }
 
     this.io.to(matchRoom(matchId)).emit('match:ended', { matchId, reason });
-    if (partnerSocketId) {
-      this.io.to(partnerSocketId).emit('match:ended', { matchId, reason });
-    }
 
     
 
