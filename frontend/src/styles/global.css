@@ -1115,3 +1115,17 @@ a:focus-visible {
   cursor: pointer;
 }
 .app-header__brand--button:hover { opacity: 0.9; }
+
+.chat-panel--waiting {
+  gap: var(--space-4);
+}
+.waiting-preview__video {
+  width: 100%;
+  max-width: 20rem;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  background: #000;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+}

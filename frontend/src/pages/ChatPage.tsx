@@ -5,6 +5,7 @@ import { AppHeader } from '../components/AppHeader';
 import { ChatComposer } from '../components/ChatComposer';
 import { MessageBubble } from '../components/MessageBubble';
 import { VideoCallPanel } from '../components/VideoCallPanel';
+import { VideoStream } from '../components/VideoStream';
 import { useSession } from '../hooks/use-session';
 import { useChatSocket } from '../hooks/use-chat-socket';
 import { useMediaCall } from '../hooks/use-media-call';
@@ -15,6 +16,8 @@ export const ChatPage = () => {
   const messageListRef = useRef<HTMLUListElement>(null);
   const modalListRef = useRef<HTMLUListElement>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const previewStreamRef = useRef<MediaStream | null>(null);
 
   const {
     connectionStatus,
@@ -67,6 +70,12 @@ export const ChatPage = () => {
       return;
     }
 
+    if (previewStreamRef.current) {
+      previewStreamRef.current.getTracks().forEach((track) => track.stop());
+      previewStreamRef.current = null;
+      setPreviewStream(null);
+    }
+
     autoCallMatchRef.current = matchId;
 
     void startCall({ automatic: true });
@@ -117,6 +126,51 @@ export const ChatPage = () => {
 
     joinQueue();
   }, [autoJoinEnabled, chatStatus, connectionStatus, joinQueue]);
+
+  // Acquisition de la caméra pendant la recherche pour afficher un aperçu local.
+  useEffect(() => {
+    if (chatStatus !== 'waiting') {
+      if (previewStreamRef.current) {
+        previewStreamRef.current.getTracks().forEach((track) => track.stop());
+        previewStreamRef.current = null;
+        setPreviewStream(null);
+      }
+      return;
+    }
+
+    let cancelled = false;
+
+    const acquire = async (): Promise<void> => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: { width: { ideal: 640 }, height: { ideal: 480 } },
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        previewStreamRef.current = stream;
+        setPreviewStream(stream);
+      } catch {
+        // Permission refusée : on garde l'affichage sans aperçu.
+      }
+    };
+
+    void acquire();
+
+    return () => {
+      cancelled = true;
+      if (previewStreamRef.current) {
+        previewStreamRef.current.getTracks().forEach((track) => track.stop());
+        previewStreamRef.current = null;
+        setPreviewStream(null);
+      }
+    };
+  }, [chatStatus]);
 
   // Défile automatiquement vers le dernier message reçu (fenêtre modale).
   useEffect(() => {
@@ -291,8 +345,12 @@ export const ChatPage = () => {
             ) : null}
           </>
         ) : chatStatus === 'waiting' ? (
-          <section className="chat-panel" aria-live="polite">
-            <div className="spinner" aria-hidden="true" />
+          <section className="chat-panel chat-panel--waiting" aria-live="polite">
+            {previewStream ? (
+              <VideoStream stream={previewStream} className="waiting-preview__video" muted label="Votre caméra" />
+            ) : (
+              <div className="spinner" aria-hidden="true" />
+            )}
             <h2 className="chat-panel__title">Recherche d’un partenaire…</h2>
             <p className="chat-panel__text">
               Vous serez mis en relation avec un autre utilisateur de la plateforme dès qu’un
