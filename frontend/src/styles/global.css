@@ -1101,3 +1101,17 @@ a:focus-visible {
     cursor: pointer;
   }
 }
+
+.app-header__brand--button {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 800;
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+}
+.app-header__brand--button:hover { opacity: 0.9; }

@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useSession } from '../hooks/use-session';
 import type { ConnectionStatus } from '../types';
 
@@ -13,15 +13,21 @@ export interface AppHeaderProps {
  * En-tête commun : identité de l'utilisateur.
  */
 export const AppHeader = ({ children, connectionStatus }: AppHeaderProps) => {
-  const { user } = useSession();
+  const { user, logout } = useSession();
+  const navigate = useNavigate();
 
   const displayName = user?.displayName ?? 'Invité';
 
+  const handleLogoClick = (): void => {
+    logout();
+    navigate('/', { replace: true });
+  };
+
   return (
     <header className="app-header">
-      <Link to="/chat" className="app-header__brand">
+      <button type="button" className="app-header__brand app-header__brand--button" onClick={handleLogoClick}>
         💬 I-Keketa
-      </Link>
+      </button>
 
       {children}
 
