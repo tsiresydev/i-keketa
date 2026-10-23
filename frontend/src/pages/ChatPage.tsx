@@ -39,7 +39,6 @@ export const ChatPage = () => {
     remoteStream,
     isMicrophoneEnabled,
     isCameraEnabled,
-    facingMode,
     partnerMedia,
     error: callError,
     notice: callNotice,
@@ -48,7 +47,7 @@ export const ChatPage = () => {
     declineCall,
     endCall,
     toggleMicrophone,
-    cycleCamera,
+    toggleCamera,
     clearError: clearCallError,
     clearNotice: clearCallNotice,
   } = useMediaCall(socket, matchId);
@@ -246,17 +245,16 @@ export const ChatPage = () => {
               status={callStatus}
               localStream={localStream}
               remoteStream={remoteStream}
-              isMicrophoneEnabled={isMicrophoneEnabled}
-              isCameraEnabled={isCameraEnabled}
-              facingMode={facingMode}
-              partnerMedia={partnerMedia}
+               isMicrophoneEnabled={isMicrophoneEnabled}
+               isCameraEnabled={isCameraEnabled}
+               partnerMedia={partnerMedia}
                partnerName={partnerName}
                localDisplayName={user?.displayName ?? 'Vous'}
               onAccept={() => void acceptCall()}
               onDecline={declineCall}
               onEnd={endCall}
-              onToggleMicrophone={toggleMicrophone}
-              onCycleCamera={() => void cycleCamera()}
+               onToggleMicrophone={toggleMicrophone}
+               onToggleCamera={toggleCamera}
             />
 
             {!isInCall ? (

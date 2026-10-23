@@ -7,7 +7,6 @@ export interface VideoCallPanelProps {
   remoteStream: MediaStream | null;
   isMicrophoneEnabled: boolean;
   isCameraEnabled: boolean;
-  facingMode?: 'user' | 'environment';
   partnerMedia: { audio: boolean; video: boolean };
   partnerName: string;
   localDisplayName?: string;
@@ -15,7 +14,7 @@ export interface VideoCallPanelProps {
   onDecline: () => void;
   onEnd: () => void;
   onToggleMicrophone: () => void;
-  onCycleCamera: () => void;
+  onToggleCamera: () => void;
 }
 
 /**
@@ -28,7 +27,6 @@ export const VideoCallPanel = ({
   remoteStream,
   isMicrophoneEnabled,
   isCameraEnabled,
-  facingMode = 'user',
   partnerMedia,
   partnerName,
   localDisplayName = 'Vous',
@@ -36,7 +34,7 @@ export const VideoCallPanel = ({
   onDecline,
   onEnd,
   onToggleMicrophone,
-  onCycleCamera,
+  onToggleCamera,
 }: VideoCallPanelProps) => {
   if (status === 'idle') {
     return null;
@@ -148,33 +146,17 @@ export const VideoCallPanel = ({
         <button
           type="button"
           className={`call-control ${isCameraEnabled ? '' : 'call-control--off'}`}
-          onClick={() => void onCycleCamera()}
+          onClick={onToggleCamera}
           aria-pressed={isCameraEnabled}
-          title={
-            isCameraEnabled
-              ? facingMode === 'user'
-                ? 'Passer à la caméra dorsale'
-                : 'Désactiver la caméra'
-              : 'Activer la caméra'
-          }
-          aria-label={
-            isCameraEnabled
-              ? facingMode === 'user'
-                ? 'Passer à la caméra dorsale'
-                : 'Désactiver la caméra'
-              : 'Activer la caméra'
-          }
+          title={isCameraEnabled ? 'Désactiver la caméra' : 'Activer la caméra'}
+          aria-label={isCameraEnabled ? 'Désactiver la caméra' : 'Activer la caméra'}
         >
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M23 7 16 12 23 17V7z" />
             <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
           </svg>
           <span className="call-control__label">
-            {isCameraEnabled
-              ? facingMode === 'user'
-                ? 'Caméra (frontale)'
-                : 'Caméra (dorsale)'
-              : 'Caméra coupée'}
+            {isCameraEnabled ? 'Caméra' : 'Caméra coupée'}
           </span>
         </button>
 
