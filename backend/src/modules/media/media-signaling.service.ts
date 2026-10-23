@@ -336,6 +336,8 @@ export class MediaSignalingService {
       this.clearPendingTimeout(matchId);
 
       this.io.to(matchRoom(matchId)).emit('media:ended', { matchId, reason });
+      this.io.to(call.callerSocketId).emit('media:ended', { matchId, reason });
+      this.io.to(call.calleeSocketId).emit('media:ended', { matchId, reason });
       return;
     }
 
@@ -348,6 +350,8 @@ export class MediaSignalingService {
     );
 
     this.io.to(matchRoom(matchId)).emit('media:ended', { matchId, reason });
+    this.io.to(call.callerSocketId).emit('media:ended', { matchId, reason });
+    this.io.to(call.calleeSocketId).emit('media:ended', { matchId, reason });
   }
 
   /**
