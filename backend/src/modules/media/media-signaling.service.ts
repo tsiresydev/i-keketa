@@ -3,6 +3,7 @@ import type { Server, Socket } from 'socket.io';
 import { logger } from '../../config/logger';
 import { CallSessionModel, type CallEndReason } from '../../models/call-session.model';
 import type { MatchmakingService } from '../chat/matchmaking.service';
+import { matchRoom } from '../chat/matchmaking.service';
 /**
  * Codes d'erreur des événements temps réels related à l'audiovisuel.
  */
@@ -334,8 +335,7 @@ export class MediaSignalingService {
       this.activeCalls.delete(matchId);
       this.clearPendingTimeout(matchId);
 
-      this.io.to(call.callerSocketId).emit('media:ended', { matchId, reason });
-      this.io.to(call.calleeSocketId).emit('media:ended', { matchId, reason });
+      this.io.to(matchRoom(matchId)).emit('media:ended', { matchId, reason });
       return;
     }
 
@@ -347,8 +347,7 @@ export class MediaSignalingService {
       { status: 'ended', endedAt: new Date(), endedReason: reason },
     );
 
-    this.io.to(call.callerSocketId).emit('media:ended', { matchId, reason });
-    this.io.to(call.calleeSocketId).emit('media:ended', { matchId, reason });
+    this.io.to(matchRoom(matchId)).emit('media:ended', { matchId, reason });
   }
 
   /**
