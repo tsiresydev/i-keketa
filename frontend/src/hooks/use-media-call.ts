@@ -601,7 +601,9 @@ export const useMediaCall = (
     };
 
     const handleEnded = (payload: { matchId: string; reason?: string }): void => {
-      if (payload.matchId !== matchIdRef.current) {
+      // On réinitialise l'appel même si la référence de session a déjà été
+      // vidée (la fin de match peut précéder la fin d'appel côté client).
+      if (payload.matchId && matchIdRef.current && payload.matchId !== matchIdRef.current) {
         return;
       }
 
@@ -611,6 +613,14 @@ export const useMediaCall = (
       });
     };
 
+    const handleMatchEnded = (payload: { matchId: string; reason?: string }): void => {
+      if (payload.matchId && matchIdRef.current && payload.matchId !== matchIdRef.current) {
+        return;
+      }
+
+      resetCall();
+    };
+
     socket.on('media:request', handleRequest);
     socket.on('media:accepted', handleAccepted);
     socket.on('media:offer', handleOffer);
@@ -618,6 +628,7 @@ export const useMediaCall = (
     socket.on('media:candidate', handleCandidate);
     socket.on('media:state', handleState);
     socket.on('media:ended', handleEnded);
+    socket.on('match:ended', handleMatchEnded);
 
     return () => {
       socket.off('media:request', handleRequest);
@@ -627,6 +638,7 @@ export const useMediaCall = (
       socket.off('media:candidate', handleCandidate);
       socket.off('media:state', handleState);
       socket.off('media:ended', handleEnded);
+    socket.off('match:ended', handleMatchEnded);
     };
   }, [socket, addCandidate, armConnectionTimeout, createPeer, flushCandidates, resetCall]);
 
