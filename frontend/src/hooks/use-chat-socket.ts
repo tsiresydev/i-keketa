@@ -194,6 +194,7 @@ export const useChatSocket = (token: string | null): ChatSocketState & ChatSocke
 
   const leaveQueue = useCallback(() => {
     socketRef.current?.emit('queue:leave');
+    setState((previous) => ({ ...previous, chatStatus: 'idle', error: null }));
   }, []);
 
   const skipPartner = useCallback(() => {
