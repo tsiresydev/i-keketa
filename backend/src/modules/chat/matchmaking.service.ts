@@ -239,7 +239,8 @@ export class MatchmakingService {
   private pickRandomPartner(currentUserId: string): WaitingEntry | null {
     const candidateIndexes = this.waiting
       .map((entry, index) => ({ entry, index }))
-      .filter(({ entry }) => entry.userId !== currentUserId);
+      .filter(({ entry }) => entry.userId !== currentUserId)
+      .filter(({ entry }) => !this.activeMatches.has(entry.userId));
 
     if (candidateIndexes.length === 0) {
       return null;
