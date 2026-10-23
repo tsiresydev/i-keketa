@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Alert } from '../components/Alert';
 import { AppHeader } from '../components/AppHeader';
@@ -98,11 +98,16 @@ export const ChatPage = () => {
     }
   }, [messages]);
 
-  // Lance automatiquement la recherche si la page est ouverte depuis l'accueil.
   const autoSearch = (location.state as { autoSearch?: boolean } | null)?.autoSearch === true;
+  const [autoJoinEnabled, setAutoJoinEnabled] = useState(autoSearch);
+
+  const handleLeaveQueue = useCallback(() => {
+    setAutoJoinEnabled(false);
+    leaveQueue();
+  }, [leaveQueue]);
 
   useEffect(() => {
-    if (!autoSearch) {
+    if (!autoJoinEnabled) {
       return;
     }
 
@@ -111,7 +116,7 @@ export const ChatPage = () => {
     }
 
     joinQueue();
-  }, [autoSearch, chatStatus, connectionStatus, joinQueue]);
+  }, [autoJoinEnabled, chatStatus, connectionStatus, joinQueue]);
 
   // Défile automatiquement vers le dernier message reçu (fenêtre modale).
   useEffect(() => {
@@ -294,7 +299,7 @@ export const ChatPage = () => {
               partenaire sera disponible.
             </p>
             <div className="chat-panel__actions">
-              <button type="button" className="button button--secondary" onClick={leaveQueue}>
+               <button type="button" className="button button--secondary" onClick={handleLeaveQueue}>
                 Arrêter la recherche
               </button>
             </div>
