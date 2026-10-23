@@ -333,6 +333,9 @@ export class MediaSignalingService {
       // clore, seule la réservation est levée.
       this.activeCalls.delete(matchId);
       this.clearPendingTimeout(matchId);
+
+      this.io.to(call.callerSocketId).emit('media:ended', { matchId, reason });
+      this.io.to(call.calleeSocketId).emit('media:ended', { matchId, reason });
       return;
     }
 
@@ -343,6 +346,9 @@ export class MediaSignalingService {
       { _id: call.sessionId, status: { $ne: 'ended' } },
       { status: 'ended', endedAt: new Date(), endedReason: reason },
     );
+
+    this.io.to(call.callerSocketId).emit('media:ended', { matchId, reason });
+    this.io.to(call.calleeSocketId).emit('media:ended', { matchId, reason });
   }
 
   /**
