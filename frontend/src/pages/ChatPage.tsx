@@ -87,6 +87,12 @@ export const ChatPage = () => {
       endCall();
     }
   }, [chatStatus, callStatus, endCall]);
+
+  useEffect(() => {
+    if (!matchId && callStatus !== 'idle') {
+      endCall();
+    }
+  }, [matchId, callStatus, endCall]);
   useEffect(() => {
     if (callStatus !== 'ringing') {
       autoAcceptMatchRef.current = null;
