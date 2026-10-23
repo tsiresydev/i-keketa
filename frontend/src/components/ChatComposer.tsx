@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { MESSAGE_MAX_LENGTH } from '../lib/validation';
 
 export interface ChatComposerProps {
@@ -12,12 +12,6 @@ export interface ChatComposerProps {
 export const ChatComposer = ({ disabled, onSend }: ChatComposerProps) => {
   const [content, setContent] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!disabled) {
-      inputRef.current?.focus();
-    }
-  }, [disabled]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
