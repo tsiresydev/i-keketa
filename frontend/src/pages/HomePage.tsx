@@ -70,6 +70,48 @@ export const HomePage = () => {
     }
   };
 
+  const isMobile =
+    typeof window !== 'undefined' && (window.matchMedia?.('(max-width: 767px)')?.matches ?? false);
+
+  if (isMobile) {
+    return (
+      <div className="home-page">
+        <section className="home-page__hero">
+          <h1 className="home-page__title">Rencontrez des partenaires en vidéo</h1>
+          <p className="home-page__text">
+            I-Keketa met en relation des personnes de manière aléatoire pour discuter en vidéo, à
+            Madagascar. Entrez un nom affiché, soyez mis en relation avec un autre utilisateur et
+            échangez en visio. Aucun compte, aucun mot de passe.
+          </p>
+        </section>
+
+        <form onSubmit={handleSubmit} className="home-page__form" noValidate>
+          {formError ? <Alert variant="error">{formError}</Alert> : null}
+
+          <FormField
+            label="Nom affiché"
+            value={displayName}
+            onChange={setDisplayName}
+            error={fieldError}
+            placeholder="Ex. Alex"
+            disabled={isSubmitting || status === 'loading'}
+            autoComplete="nickname"
+            maxLength={40}
+            hint="2 à 40 caractères. Ce nom sera vu par la personne avec qui vous discuterez."
+          />
+
+          <button type="submit" className="button" disabled={isSubmitting || status === 'loading'}>
+            {isSubmitting ? 'Recherche d’un partenaire…' : 'Trouver un partenaire'}
+          </button>
+        </form>
+
+        <p className="home-page__footer">
+          <a href="/chat">Déjà une session active ? Revenir à la discussion</a>
+        </p>
+      </div>
+    );
+  }
+
   const scrollToHow = (): void => {
     document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
   };
