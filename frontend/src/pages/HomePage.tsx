@@ -104,10 +104,6 @@ export const HomePage = () => {
             {isSubmitting ? 'Recherche d’un partenaire…' : 'Trouver un partenaire'}
           </button>
         </form>
-
-        <p className="home-page__footer">
-          <a href="/chat">Déjà une session active ? Revenir à la discussion</a>
-        </p>
       </div>
     );
   }
